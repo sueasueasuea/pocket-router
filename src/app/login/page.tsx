@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/hooks/useAuthStore';
+import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
 import { supabase } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Wallet } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Wallet, Globe } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -56,6 +58,23 @@ export default function LoginPage() {
 
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
+  const { settings, updateSettings } = usePocketRouterStore();
+  const [currency, setCurrency] = useState(settings.currency);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted) {
+      setCurrency(settings.currency);
+    }
+  }, [settings.currency, mounted]);
+
+  const handleSaveCurrency = () => {
+    updateSettings({ currency });
+  };
 
   if (user) {
     return (
@@ -70,6 +89,40 @@ export default function LoginPage() {
               <span className="text-sm font-medium text-zinc-500">Email:</span>
               <p className="font-medium">{user.email}</p>
             </div>
+
+            {/* Currency Settings */}
+            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Globe className="w-4 h-4 text-zinc-500" />
+                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Settings</span>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="profile-currency">Default Currency</Label>
+                <div className="flex gap-2">
+                  <Select value={currency} onValueChange={(val) => setCurrency(val ?? 'THB')}>
+                    <SelectTrigger id="profile-currency" className="flex-1">
+                      <SelectValue placeholder="Select Currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="THB">THB (฿)</SelectItem>
+                      <SelectItem value="USD">USD ($)</SelectItem>
+                      <SelectItem value="EUR">EUR (€)</SelectItem>
+                      <SelectItem value="GBP">GBP (£)</SelectItem>
+                      <SelectItem value="JPY">JPY (¥)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    className="rounded-full"
+                    onClick={handleSaveCurrency}
+                    disabled={currency === settings.currency}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             <Button 
               variant="destructive" 
               className="w-full" 

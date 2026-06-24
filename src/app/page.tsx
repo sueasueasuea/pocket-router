@@ -2,16 +2,17 @@
 
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
 import { DashboardSummary } from '@/components/DashboardSummary';
-import { BankCard } from '@/components/BankCard';
 import { PocketCard } from '@/components/PocketCard';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Plus, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
 
 export default function Home() {
-  const { banks, pockets, allocations, settings } = usePocketRouterStore();
+  const { pockets, allocations, settings } = usePocketRouterStore();
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
@@ -40,44 +41,6 @@ export default function Home() {
         {/* Main Summary */}
         <section>
           <DashboardSummary />
-        </section>
-
-        {/* Banks Section */}
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">My Banks</h2>
-            <Link href="/banks">
-              <Button variant="ghost" size="sm" className="h-8 text-xs font-semibold text-primary">
-                View All <ArrowRight className="w-3 h-3 ml-1" />
-              </Button>
-            </Link>
-          </div>
-          
-          {banks.length === 0 ? (
-            <div className="bg-white dark:bg-zinc-900 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 flex flex-col items-center justify-center text-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-                <Plus className="w-6 h-6 text-zinc-400" />
-              </div>
-              <div>
-                <p className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">No banks added</p>
-                <p className="text-xs text-zinc-500 max-w-[200px] mt-1">Add your high-yield savings accounts here.</p>
-              </div>
-              <Link href="/banks">
-                <Button size="sm" className="mt-2 rounded-full">Add Bank</Button>
-              </Link>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {banks.map(bank => (
-                <BankCard 
-                  key={bank.id} 
-                  bank={bank} 
-                  allocations={allocations} 
-                  settings={settings} 
-                />
-              ))}
-            </div>
-          )}
         </section>
 
         {/* Pockets Section */}
@@ -111,7 +74,8 @@ export default function Home() {
                   key={pocket.id} 
                   pocket={pocket} 
                   allocations={allocations} 
-                  settings={settings} 
+                  settings={settings}
+                  onClick={() => router.push(`/pockets/${pocket.id}`)}
                 />
               ))}
             </div>

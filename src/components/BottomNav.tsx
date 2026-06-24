@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Landmark, Wallet, PlusCircle, User } from 'lucide-react';
+import { Home, Wallet, User, Landmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
@@ -21,9 +21,8 @@ export function BottomNav() {
 
   const links = [
     { href: '/', label: 'Home', icon: Home },
-    { href: '/pockets', label: 'Pockets', icon: Wallet },
-    { href: '/allocate', label: 'Allocate', icon: PlusCircle },
     { href: '/banks', label: 'Banks', icon: Landmark },
+    { href: '/pockets', label: 'Pockets', icon: Wallet },
     { href: '/login', label: user ? 'Profile' : 'Login', icon: User },
   ];
 

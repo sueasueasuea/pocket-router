@@ -6,133 +6,154 @@ import { Bank } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 import { Card, CardContent } from '@/components/ui/card';
-import { Landmark, Plus, Trash2, Edit2, Settings, Globe } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAuthStore } from '@/hooks/useAuthStore';
-import { useRouter } from 'next/navigation';
+import {
+  Plus,
+  Landmark,
+  Edit2,
+  Trash2,
+  TrendingUp,
+} from 'lucide-react';
 
 const PRESET_COLORS = [
   { name: 'Emerald', value: '#10b981' },
   { name: 'Teal', value: '#14b8a6' },
+  { name: 'Cyan', value: '#06b6d4' },
+  { name: 'Sky', value: '#0ea5e9' },
   { name: 'Blue', value: '#3b82f6' },
   { name: 'Indigo', value: '#6366f1' },
   { name: 'Violet', value: '#8b5cf6' },
+  { name: 'Purple', value: '#a855f7' },
+  { name: 'Fuchsia', value: '#d946ef' },
+  { name: 'Pink', value: '#ec4899' },
   { name: 'Rose', value: '#f43f5e' },
+  { name: 'Red', value: '#ef4444' },
   { name: 'Orange', value: '#f97316' },
-  { name: 'Slate', value: '#64748b' }
+  { name: 'Amber', value: '#f59e0b' },
+  { name: 'Yellow', value: '#eab308' },
+  { name: 'Lime', value: '#84cc16' },
+  { name: 'Green', value: '#22c55e' },
+  { name: 'Slate', value: '#64748b' },
 ];
 
-export default function BanksPage() {
-  const { banks, allocations, settings, addBank, updateBank, deleteBank, updateSettings } = usePocketRouterStore();
+export default function ManageBanksPage() {
+  const {
+    banks,
+    allocations,
+    settings,
+    addBank,
+    updateBank,
+    deleteBank,
+  } = usePocketRouterStore();
+
   const [mounted, setMounted] = useState(false);
-  const router = useRouter();
-  const user = useAuthStore((state) => state.user);
-  
-  // Dialog States
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Add bank dialog
+  const [isAddBankOpen, setIsAddBankOpen] = useState(false);
+  const [bankName, setBankName] = useState('');
+  const [bankInterestRate, setBankInterestRate] = useState('');
+  const [bankLogoUrl, setBankLogoUrl] = useState('');
+  const [bankThemeColor, setBankThemeColor] = useState(PRESET_COLORS[0].value);
+
+  // Edit bank dialog
+  const [isEditBankOpen, setIsEditBankOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
 
-  // Form States
-  const [name, setName] = useState('');
-  const [interestRate, setInterestRate] = useState('');
-  const [logoUrl, setLogoUrl] = useState('');
-  const [themeColor, setThemeColor] = useState(PRESET_COLORS[0].value);
-  const [currency, setCurrency] = useState(settings.currency);
+  // Delete confirmation
+  const [deletingBank, setDeletingBank] = useState<Bank | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (mounted) {
-      setCurrency(settings.currency);
-    }
-  }, [settings.currency, mounted]);
-
-
-  if (!mounted) return <div className="p-6">Loading...</div>;
-
-  const handleAddBank = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !interestRate) return;
-
-    const newBank: Bank = {
-      id: crypto.randomUUID(),
-      name,
-      interestRate: parseFloat(interestRate),
-      logoUrl: logoUrl || undefined,
-      themeColor,
-      createdAt: new Date().toISOString()
-    };
-
-    addBank(newBank);
-    resetForm();
-    setIsAddOpen(false);
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: settings.currency,
+      maximumFractionDigits: 0,
+    }).format(amount);
   };
 
-  const handleEditBank = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingBank || !name || !interestRate) return;
-
-    updateBank(editingBank.id, {
-      name,
-      interestRate: parseFloat(interestRate),
-      logoUrl: logoUrl || undefined,
-      themeColor
-    });
-
-    resetForm();
-    setIsEditOpen(false);
-  };
-
-  const openEditDialog = (bank: Bank) => {
-    setEditingBank(bank);
-    setName(bank.name);
-    setInterestRate(bank.interestRate.toString());
-    setLogoUrl(bank.logoUrl || '');
-    setThemeColor(bank.themeColor);
-    setIsEditOpen(true);
-  };
-
-  const handleDeleteBank = (id: string) => {
-    if (confirm('Are you sure you want to delete this bank? This will remove all allocations to this bank.')) {
-      deleteBank(id);
-    }
-  };
-
-  const handleSaveSettings = () => {
-    updateSettings({ currency });
-    setIsSettingsOpen(false);
-  };
-
-  const resetForm = () => {
-    setName('');
-    setInterestRate('');
-    setLogoUrl('');
-    setThemeColor(PRESET_COLORS[0].value);
-    setEditingBank(null);
-  };
-
-  const getBankBalance = (bankId: string) => {
+  const getBankTotal = (bankId: string) => {
     return allocations
       .filter((a) => a.bankId === bankId)
       .reduce((sum, a) => sum + a.amount, 0);
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: settings.currency,
-      maximumFractionDigits: 2,
-    }).format(amount);
+  const getBankPocketCount = (bankId: string) => {
+    return new Set(
+      allocations.filter((a) => a.bankId === bankId).map((a) => a.pocketId)
+    ).size;
   };
 
+  const resetBankForm = () => {
+    setBankName('');
+    setBankInterestRate('');
+    setBankLogoUrl('');
+    setBankThemeColor(PRESET_COLORS[0].value);
+    setEditingBank(null);
+  };
+
+  const handleAddBank = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bankName || !bankInterestRate) return;
+
+    addBank({
+      id: crypto.randomUUID(),
+      name: bankName,
+      interestRate: parseFloat(bankInterestRate),
+      logoUrl: bankLogoUrl || undefined,
+      themeColor: bankThemeColor,
+      createdAt: new Date().toISOString(),
+    });
+
+    resetBankForm();
+    setIsAddBankOpen(false);
+  };
+
+  const openEditBankDialog = (bank: Bank) => {
+    setEditingBank(bank);
+    setBankName(bank.name);
+    setBankInterestRate(bank.interestRate.toString());
+    setBankLogoUrl(bank.logoUrl || '');
+    setBankThemeColor(bank.themeColor);
+    setIsEditBankOpen(true);
+  };
+
+  const handleEditBank = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBank || !bankName || !bankInterestRate) return;
+
+    updateBank(editingBank.id, {
+      name: bankName,
+      interestRate: parseFloat(bankInterestRate),
+      logoUrl: bankLogoUrl || undefined,
+      themeColor: bankThemeColor,
+    });
+
+    resetBankForm();
+    setIsEditBankOpen(false);
+  };
+
+  const handleDeleteBank = (bank: Bank) => {
+    setDeletingBank(bank);
+  };
+
+  const confirmDeleteBank = () => {
+    if (deletingBank) {
+      deleteBank(deletingBank.id);
+      setDeletingBank(null);
+    }
+  };
+
+  if (!mounted) {
+    return <div className="p-6">Loading...</div>;
+  }
+
   return (
-    <main className="flex flex-col min-h-full bg-zinc-50 dark:bg-zinc-950 pb-8">
+    <main className="flex flex-col min-h-full bg-zinc-50 dark:bg-zinc-950 pb-28">
       {/* Header */}
       <header className="bg-white dark:bg-zinc-900 sticky top-0 z-10 border-b border-zinc-100 dark:border-zinc-800 w-full">
         <div className="max-w-4xl mx-auto w-full px-6 pt-12 pb-4 flex justify-between items-center">
@@ -141,84 +162,129 @@ export default function BanksPage() {
               Banks
             </h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">
-              Manage your accounts & interest rates
+              {banks.length} bank{banks.length !== 1 ? 's' : ''} registered
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={() => setIsSettingsOpen(true)}
-              className="rounded-full"
-            >
-              <Settings className="w-4 h-4" />
-            </Button>
-            <Button 
-              onClick={() => { resetForm(); setIsAddOpen(true); }} 
-              size="icon" 
-              className="rounded-full"
-            >
-              <Plus className="w-4 h-4" />
-            </Button>
-          </div>
+          <Button
+            onClick={() => {
+              resetBankForm();
+              setIsAddBankOpen(true);
+            }}
+            size="icon"
+            className="rounded-full"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
         </div>
       </header>
 
       <div className="flex-1 w-full max-w-4xl mx-auto px-6 pt-6 flex flex-col gap-4">
         {banks.length === 0 ? (
           <div className="bg-white dark:bg-zinc-900 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl p-12 flex flex-col items-center justify-center text-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
-              <Landmark className="w-6 h-6 text-zinc-400" />
+            <div className="w-14 h-14 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center">
+              <Landmark className="w-7 h-7 text-zinc-400" />
             </div>
             <div>
-              <p className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">No banks added yet</p>
-              <p className="text-xs text-zinc-500 max-w-[220px] mt-1">
-                Add banks to start routing your virtual pockets.
+              <p className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
+                No banks yet
+              </p>
+              <p className="text-xs text-zinc-500 max-w-[240px] mt-1">
+                Add your bank accounts to start allocating money across pockets.
               </p>
             </div>
-            <Button size="sm" className="mt-2 rounded-full" onClick={() => setIsAddOpen(true)}>
-              Add Your First Bank
+            <Button
+              size="sm"
+              className="mt-2 rounded-full"
+              onClick={() => {
+                resetBankForm();
+                setIsAddBankOpen(true);
+              }}
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              Add First Bank
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-3">
             {banks.map((bank) => {
-              const balance = getBankBalance(bank.id);
-              const estInterest = (balance * bank.interestRate) / 100;
+              const total = getBankTotal(bank.id);
+              const pocketCount = getBankPocketCount(bank.id);
+              const estimatedInterest = (total * bank.interestRate) / 100;
+
               return (
-                <Card 
+                <Card
                   key={bank.id}
-                  className="overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm relative"
+                  className="overflow-hidden border-none shadow-sm hover:shadow-md transition-all duration-200"
+                  style={{ backgroundColor: bank.themeColor }}
                 >
-                  <div className="absolute top-0 left-0 w-2 h-full" style={{ backgroundColor: bank.themeColor }} />
-                  <CardContent className="p-4 pl-6 flex justify-between items-center">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        {bank.logoUrl ? (
-                          <img src={bank.logoUrl} alt={bank.name} className="w-6 h-6 rounded-full object-cover" />
-                        ) : (
-                          <Landmark className="w-4 h-4 text-zinc-400" />
-                        )}
-                        <h3 className="font-bold text-zinc-950 dark:text-zinc-50">{bank.name}</h3>
+                  <div className="bg-black/10 dark:bg-black/40 backdrop-blur-[2px] w-full h-full">
+                    <CardContent className="p-0 text-white">
+                      <div className="flex items-stretch">
+                        {/* Bank info */}
+                        <div className="flex-1 p-5">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <h3 className="font-bold text-lg leading-tight tracking-tight drop-shadow-sm">
+                                {bank.name}
+                              </h3>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <TrendingUp className="w-3 h-3 text-white/70" />
+                                <span className="text-xs font-medium text-white/70">
+                                  {bank.interestRate}% / year
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-end gap-6">
+                            <div>
+                              <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">
+                                Total Balance
+                              </p>
+                              <p className="text-xl font-bold tracking-tight drop-shadow-md">
+                                {formatCurrency(total)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">
+                                Est. Interest
+                              </p>
+                              <p className="text-sm font-semibold text-white/80">
+                                +{formatCurrency(estimatedInterest)}
+                              </p>
+                            </div>
+                            {pocketCount > 0 && (
+                              <div>
+                                <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">
+                                  Pockets
+                                </p>
+                                <p className="text-sm font-semibold text-white/80">
+                                  {pocketCount}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex flex-col border-l border-white/10">
+                          <button
+                            className="flex-1 flex items-center justify-center px-4 hover:bg-white/10 transition-colors duration-150"
+                            onClick={() => openEditBankDialog(bank)}
+                          >
+                            <Edit2 className="w-4 h-4 text-white/80" />
+                          </button>
+                          <div className="border-t border-white/10" />
+                          <button
+                            className="flex-1 flex items-center justify-center px-4 hover:bg-rose-500/20 transition-colors duration-150"
+                            onClick={() => handleDeleteBank(bank)}
+                          >
+                            <Trash2 className="w-4 h-4 text-white/80" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex gap-4 text-xs text-zinc-500 mt-1">
-                        <span>Interest: <strong className="text-zinc-900 dark:text-zinc-100">{bank.interestRate}%</strong></span>
-                        <span>Balance: <strong className="text-zinc-900 dark:text-zinc-100">{formatCurrency(balance)}</strong></span>
-                      </div>
-                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                        + {formatCurrency(estInterest)} / yr interest
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => openEditDialog(bank)}>
-                        <Edit2 className="w-3.5 h-3.5 text-zinc-500" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-rose-50 dark:hover:bg-rose-950/20" onClick={() => handleDeleteBank(bank.id)}>
-                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                      </Button>
-                    </div>
-                  </CardContent>
+                    </CardContent>
+                  </div>
                 </Card>
               );
             })}
@@ -227,42 +293,42 @@ export default function BanksPage() {
       </div>
 
       {/* Add Bank Dialog */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+      <Dialog open={isAddBankOpen} onOpenChange={setIsAddBankOpen}>
         <DialogContent className="max-w-sm rounded-3xl">
           <DialogHeader>
             <DialogTitle>Add Bank</DialogTitle>
-            <DialogDescription>Create a custom bank account profile.</DialogDescription>
+            <DialogDescription>Create a new bank account profile.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddBank} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Bank Name</Label>
-              <Input 
-                id="name" 
-                placeholder="e.g. Kept by Krungsri" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                required 
+              <Label htmlFor="bank-name">Bank Name</Label>
+              <Input
+                id="bank-name"
+                placeholder="e.g. Kept by Krungsri"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="interestRate">Interest Rate (%)</Label>
-              <Input 
-                id="interestRate" 
-                type="number" 
-                step="0.01" 
-                placeholder="e.g. 1.5" 
-                value={interestRate} 
-                onChange={(e) => setInterestRate(e.target.value)} 
-                required 
+              <Label htmlFor="bank-rate">Interest Rate (%)</Label>
+              <Input
+                id="bank-rate"
+                type="number"
+                step="0.01"
+                placeholder="e.g. 1.5"
+                value={bankInterestRate}
+                onChange={(e) => setBankInterestRate(e.target.value)}
+                required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="logoUrl">Logo URL (Optional)</Label>
-              <Input 
-                id="logoUrl" 
-                placeholder="https://..." 
-                value={logoUrl} 
-                onChange={(e) => setLogoUrl(e.target.value)} 
+              <Label htmlFor="bank-logo">Logo URL (Optional)</Label>
+              <Input
+                id="bank-logo"
+                placeholder="https://..."
+                value={bankLogoUrl}
+                onChange={(e) => setBankLogoUrl(e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -272,60 +338,87 @@ export default function BanksPage() {
                   <button
                     key={color.value}
                     type="button"
-                    className="w-8 h-8 rounded-full border-2 transition-all relative flex items-center justify-center"
-                    style={{ 
+                    className="w-7 h-7 rounded-full border-2 transition-all relative flex items-center justify-center"
+                    style={{
                       backgroundColor: color.value,
-                      borderColor: themeColor === color.value ? '#000000' : 'transparent'
+                      borderColor: bankThemeColor === color.value ? '#fff' : 'transparent',
+                      boxShadow: bankThemeColor === color.value ? '0 0 0 2px #000' : 'none',
                     }}
-                    onClick={() => setThemeColor(color.value)}
+                    onClick={() => setBankThemeColor(color.value)}
                   >
-                    {themeColor === color.value && (
+                    {bankThemeColor === color.value && (
                       <span className="w-2 h-2 rounded-full bg-white block" />
                     )}
                   </button>
                 ))}
+                {/* Custom color picker */}
+                <label
+                  className="w-7 h-7 rounded-full border-2 border-dashed border-zinc-300 dark:border-zinc-600 flex items-center justify-center cursor-pointer hover:border-zinc-500 transition-colors relative overflow-hidden"
+                  title="Custom color"
+                  style={{
+                    backgroundColor: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? bankThemeColor : undefined,
+                    borderStyle: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? 'solid' : 'dashed',
+                    borderColor: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? '#fff' : undefined,
+                    boxShadow: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? '0 0 0 2px #000' : 'none',
+                  }}
+                >
+                  {PRESET_COLORS.some(c => c.value === bankThemeColor) && (
+                    <span className="text-[10px] font-bold text-zinc-400">+</span>
+                  )}
+                  {!PRESET_COLORS.some(c => c.value === bankThemeColor) && (
+                    <span className="w-2 h-2 rounded-full bg-white block" />
+                  )}
+                  <input
+                    type="color"
+                    value={bankThemeColor}
+                    onChange={(e) => setBankThemeColor(e.target.value)}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                </label>
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit" className="w-full rounded-full">Add Bank</Button>
+              <Button type="submit" className="w-full rounded-full">
+                Add Bank
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       {/* Edit Bank Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+      <Dialog open={isEditBankOpen} onOpenChange={setIsEditBankOpen}>
         <DialogContent className="max-w-sm rounded-3xl">
           <DialogHeader>
             <DialogTitle>Edit Bank</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleEditBank} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-name">Bank Name</Label>
-              <Input 
-                id="edit-name" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                required 
+              <Label htmlFor="edit-bank-name">Bank Name</Label>
+              <Input
+                id="edit-bank-name"
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-interestRate">Interest Rate (%)</Label>
-              <Input 
-                id="edit-interestRate" 
-                type="number" 
-                step="0.01" 
-                value={interestRate} 
-                onChange={(e) => setInterestRate(e.target.value)} 
-                required 
+              <Label htmlFor="edit-bank-rate">Interest Rate (%)</Label>
+              <Input
+                id="edit-bank-rate"
+                type="number"
+                step="0.01"
+                value={bankInterestRate}
+                onChange={(e) => setBankInterestRate(e.target.value)}
+                required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-logoUrl">Logo URL (Optional)</Label>
-              <Input 
-                id="edit-logoUrl" 
-                value={logoUrl} 
-                onChange={(e) => setLogoUrl(e.target.value)} 
+              <Label htmlFor="edit-bank-logo">Logo URL (Optional)</Label>
+              <Input
+                id="edit-bank-logo"
+                value={bankLogoUrl}
+                onChange={(e) => setBankLogoUrl(e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -335,57 +428,63 @@ export default function BanksPage() {
                   <button
                     key={color.value}
                     type="button"
-                    className="w-8 h-8 rounded-full border-2 transition-all relative flex items-center justify-center"
-                    style={{ 
+                    className="w-7 h-7 rounded-full border-2 transition-all relative flex items-center justify-center"
+                    style={{
                       backgroundColor: color.value,
-                      borderColor: themeColor === color.value ? '#000000' : 'transparent'
+                      borderColor: bankThemeColor === color.value ? '#fff' : 'transparent',
+                      boxShadow: bankThemeColor === color.value ? '0 0 0 2px #000' : 'none',
                     }}
-                    onClick={() => setThemeColor(color.value)}
+                    onClick={() => setBankThemeColor(color.value)}
                   >
-                    {themeColor === color.value && (
+                    {bankThemeColor === color.value && (
                       <span className="w-2 h-2 rounded-full bg-white block" />
                     )}
                   </button>
                 ))}
+                {/* Custom color picker */}
+                <label
+                  className="w-7 h-7 rounded-full border-2 border-dashed border-zinc-300 dark:border-zinc-600 flex items-center justify-center cursor-pointer hover:border-zinc-500 transition-colors relative overflow-hidden"
+                  title="Custom color"
+                  style={{
+                    backgroundColor: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? bankThemeColor : undefined,
+                    borderStyle: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? 'solid' : 'dashed',
+                    borderColor: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? '#fff' : undefined,
+                    boxShadow: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? '0 0 0 2px #000' : 'none',
+                  }}
+                >
+                  {PRESET_COLORS.some(c => c.value === bankThemeColor) && (
+                    <span className="text-[10px] font-bold text-zinc-400">+</span>
+                  )}
+                  {!PRESET_COLORS.some(c => c.value === bankThemeColor) && (
+                    <span className="w-2 h-2 rounded-full bg-white block" />
+                  )}
+                  <input
+                    type="color"
+                    value={bankThemeColor}
+                    onChange={(e) => setBankThemeColor(e.target.value)}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                </label>
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit" className="w-full rounded-full">Save Changes</Button>
+              <Button type="submit" className="w-full rounded-full">
+                Save Changes
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Settings Dialog */}
-      <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-        <DialogContent className="max-w-sm rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Globe className="w-5 h-5" /> Settings
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="currency">Default Currency</Label>
-              <Select value={currency} onValueChange={(val) => setCurrency(val ?? 'THB')}>
-                <SelectTrigger id="currency">
-                  <SelectValue placeholder="Select Currency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="THB">THB (฿)</SelectItem>
-                  <SelectItem value="USD">USD ($)</SelectItem>
-                  <SelectItem value="EUR">EUR (€)</SelectItem>
-                  <SelectItem value="GBP">GBP (£)</SelectItem>
-                  <SelectItem value="JPY">JPY (¥)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter className="pt-2">
-              <Button onClick={handleSaveSettings} className="w-full rounded-full">Save Settings</Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDeleteDialog
+        open={!!deletingBank}
+        onOpenChange={(open) => !open && setDeletingBank(null)}
+        title="Delete Bank"
+        description={`Are you sure you want to delete "${deletingBank?.name}"? This will remove all its allocations across all pockets. This action cannot be undone.`}
+        confirmLabel="Delete Bank"
+        onConfirm={confirmDeleteBank}
+      />
     </main>
   );
 }

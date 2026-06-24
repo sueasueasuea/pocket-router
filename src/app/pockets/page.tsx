@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
 import { Pocket } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -9,18 +10,27 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Trash2, Edit2, Wallet } from 'lucide-react';
+import { Plus, Trash2, Edit2, Wallet, ChevronRight } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 
-const PRESET_EMOJIS = ['🏠', '💳', '🏥', '🚗', '✈️', '🎓', '🍔', '🛍️', '🎁', '💰', '🕹️', '📈', '💡', '👪'];
+const PRESET_EMOJIS = [
+  '🏠', '💳', '🏥', '🚗', '✈️', '🎓', '🍔', '🛍️',
+  '🎁', '💰', '🕹️', '📈', '💡', '👪', '🐱', '🌴',
+  '☕', '🎵', '📱', '🏋️', '🎮', '🏖️', '🍕', '🚀',
+  '💎', '🎯', '📚', '🏡', '💼', '🛡️', '⚡', '🌟',
+  '🧳', '🎬', '🏦', '💸', '🩺', '🎂', '👗', '🔧',
+];
 
 export default function PocketsPage() {
   const { pockets, allocations, settings, addPocket, updatePocket, deletePocket } = usePocketRouterStore();
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
 
   // Dialog States
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingPocket, setEditingPocket] = useState<Pocket | null>(null);
+  const [deletingPocketId, setDeletingPocketId] = useState<string | null>(null);
 
   // Form States
   const [name, setName] = useState('');
@@ -73,8 +83,13 @@ export default function PocketsPage() {
   };
 
   const handleDeletePocket = (id: string) => {
-    if (confirm('Are you sure you want to delete this pocket? This will remove all allocations assigned to it.')) {
-      deletePocket(id);
+    setDeletingPocketId(id);
+  };
+
+  const confirmDeletePocket = () => {
+    if (deletingPocketId) {
+      deletePocket(deletingPocketId);
+      setDeletingPocketId(null);
     }
   };
 
@@ -148,7 +163,8 @@ export default function PocketsPage() {
               return (
                 <Card 
                   key={pocket.id}
-                  className="border border-zinc-200 dark:border-zinc-800 shadow-sm"
+                  className="border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.98] duration-200"
+                  onClick={() => router.push(`/pockets/${pocket.id}`)}
                 >
                   <CardContent className="p-4 flex flex-col gap-3">
                     <div className="flex justify-between items-center">
@@ -166,12 +182,15 @@ export default function PocketsPage() {
                       </div>
 
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => openEditDialog(pocket)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={(e) => { e.stopPropagation(); openEditDialog(pocket); }}>
                           <Edit2 className="w-3.5 h-3.5 text-zinc-500" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-rose-50 dark:hover:bg-rose-950/20" onClick={() => handleDeletePocket(pocket.id)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-rose-50 dark:hover:bg-rose-950/20" onClick={(e) => { e.stopPropagation(); handleDeletePocket(pocket.id); }}>
                           <Trash2 className="w-3.5 h-3.5 text-rose-500" />
                         </Button>
+                        <div className="flex items-center text-zinc-300 dark:text-zinc-600">
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
                       </div>
                     </div>
 
@@ -297,6 +316,16 @@ export default function PocketsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDeleteDialog
+        open={!!deletingPocketId}
+        onOpenChange={(open) => !open && setDeletingPocketId(null)}
+        title="Delete Pocket"
+        description={`Are you sure you want to delete "${pockets.find(p => p.id === deletingPocketId)?.name}"? This will remove all allocations assigned to it. This action cannot be undone.`}
+        confirmLabel="Delete Pocket"
+        onConfirm={confirmDeletePocket}
+      />
     </main>
   );
 }

@@ -26,6 +26,8 @@ interface PocketRouterState {
   updateAllocation: (id: string, allocation: Partial<Allocation>) => Promise<void>;
   deleteAllocation: (id: string) => Promise<void>;
   
+  transferBetweenBanks: (pocketId: string, fromBankId: string, toBankId: string, amount: number) => Promise<boolean>;
+  
   updateSettings: (settings: Partial<AppSettings>) => Promise<void>;
 }
 
@@ -279,6 +281,92 @@ export const usePocketRouterStore = create<PocketRouterState>()(
         set((state) => ({
           allocations: state.allocations.filter((a) => a.id !== id)
         }));
+      },
+      
+      transferBetweenBanks: async (pocketId, fromBankId, toBankId, amount) => {
+        const state = get();
+        const user = useAuthStore.getState().user;
+        
+        // Find source allocation
+        const sourceAlloc = state.allocations.find(
+          (a) => a.pocketId === pocketId && a.bankId === fromBankId
+        );
+        if (!sourceAlloc || sourceAlloc.amount < amount || amount <= 0) {
+          return false;
+        }
+        
+        // Find or prepare target allocation
+        const targetAlloc = state.allocations.find(
+          (a) => a.pocketId === pocketId && a.bankId === toBankId
+        );
+        
+        const newSourceAmount = sourceAlloc.amount - amount;
+        
+        if (state.settings.storageType === 'supabase') {
+          try {
+            // Update or delete source
+            if (newSourceAmount <= 0) {
+              const { error } = await supabase.from('allocations').delete().eq('id', sourceAlloc.id);
+              if (error) throw error;
+            } else {
+              const { error } = await supabase.from('allocations').update({ amount: newSourceAmount }).eq('id', sourceAlloc.id);
+              if (error) throw error;
+            }
+            
+            // Update or create target
+            if (targetAlloc) {
+              const { error } = await supabase.from('allocations').update({ amount: targetAlloc.amount + amount }).eq('id', targetAlloc.id);
+              if (error) throw error;
+            } else {
+              const newId = crypto.randomUUID();
+              const { error } = await supabase.from('allocations').insert({
+                id: newId,
+                user_id: user?.id,
+                pocket_id: pocketId,
+                bank_id: toBankId,
+                amount: amount,
+                created_at: new Date().toISOString()
+              });
+              if (error) throw error;
+            }
+          } catch (error) {
+            console.error('Failed to transfer between banks in Supabase:', error);
+            return false;
+          }
+        }
+        
+        // Update local state
+        set((state) => {
+          let newAllocations = [...state.allocations];
+          
+          // Update source
+          if (newSourceAmount <= 0) {
+            newAllocations = newAllocations.filter((a) => a.id !== sourceAlloc.id);
+          } else {
+            newAllocations = newAllocations.map((a) =>
+              a.id === sourceAlloc.id ? { ...a, amount: newSourceAmount } : a
+            );
+          }
+          
+          // Update or create target
+          if (targetAlloc) {
+            newAllocations = newAllocations.map((a) =>
+              a.id === targetAlloc.id ? { ...a, amount: targetAlloc.amount + amount } : a
+            );
+          } else {
+            newAllocations.push({
+              id: crypto.randomUUID(),
+              pocketId,
+              bankId: toBankId,
+              amount,
+              createdAt: new Date().toISOString()
+            });
+          }
+          
+          return { allocations: newAllocations };
+        });
+        
+        return true;
       },
       
       updateSettings: async (newSettings) => {
