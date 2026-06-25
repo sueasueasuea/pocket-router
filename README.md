@@ -36,7 +36,7 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
 To do:
-1. Delete any allocations or archive allocations @pocket/[id].
+1. Delete allocations, Improve accessibility on mobile @pocket/[id].
 2. Remove right arrow icon on pocket card @/pockets, prevent user missed click.
 3. Add bank icon on bank card @/banks.
 4. Remember order /banks and /pockets and both can re-arrage order by drag & drop.
