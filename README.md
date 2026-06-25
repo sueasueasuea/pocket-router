@@ -38,5 +38,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 To do:
 1. Delete any allocations or archive allocations @pocket/[id].
 2. Remove right arrow icon on pocket card @/pockets, prevent user missed click.
+3. Add bank icon on bank card @/banks.
+4. Remember order /banks and /pockets and both can re-arrage order by drag & drop.
 
 
