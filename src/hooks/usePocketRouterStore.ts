@@ -23,6 +23,12 @@ interface PocketRouterState {
   fetchData: () => Promise<void>;
   setError: (error: AppError | null) => void;
   clearError: () => void;
+  /**
+   * Wipe all domain data (banks / pockets / allocations / settings) and stop
+   * any realtime channels. Used on logout so the next user on the same
+   * device never sees the previous user's persisted state.
+   */
+  clearLocalData: () => void;
 
   subscribeRealtime: () => void;
   unsubscribeRealtime: () => void;
@@ -132,6 +138,23 @@ export const usePocketRouterStore = create<PocketRouterState>()(
 
       setError: (error) => set({ lastError: error }),
       clearError: () => set({ lastError: null }),
+
+      clearLocalData: () => {
+        // Defensive: drop realtime channels before wiping state so callbacks
+        // don't fire on the old (now-cleared) data. unsubscribeRealtime is
+        // idempotent — safe to call even when no channel is active.
+        get().unsubscribeRealtime();
+        set({
+          banks: [],
+          pockets: [],
+          allocations: [],
+          settings: { currency: 'THB', storageType: 'local' },
+          lastError: null,
+        });
+        // The zustand `persist` middleware auto-writes on state changes, so
+        // the empty arrays + default settings above will land in localStorage
+        // on the next tick. No explicit clearStorage() needed.
+      },
 
       fetchData: async () => {
         const state = get();

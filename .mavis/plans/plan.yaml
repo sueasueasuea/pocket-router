@@ -1,0 +1,132 @@
+version: 1
+plan:
+  name: 'แก้บัค drag-drop reorder + logout ไม่เคลียร์ local state'
+  max_concurrency: 2
+  max_consecutive_failures: 2
+  max_cycles: 6
+  auto_reject_retries: 1
+  verifier_config:
+    default_verifiers: [verifier]
+    audit_sample_rate: 0.0
+tasks:
+  - id: fix-bugs
+    title: 'แก้บัค drag-drop reorder และ logout state clear'
+    assigned_to: coder
+    verified_by: verifier
+    max_retries: 2
+    prompt: |
+      โปรเจกต์: D:\dev\money-tagging (Next.js 16 + React 19 + zustand v5 + Supabase)
+      โหมด runtime: win32 / PowerShell
+
+      ## บริบท
+      ผู้ใช้รายงานบัค 2 ตัวในแอป Pocket Router:
+      1. กดลากแล้ววางเพื่อ reorder ในหน้า /banks และ /pockets แล้ว "ไม่มี API call" และ "ไม่อัปเดต local state" ด้วย
+      2. logout แล้ว local state ของธนาคาร/กระเป๋า/การจัดสรร "ยังค้างอยู่" ควรลบทิ้ง
+
+      ## งานของคุณ — แก้ทั้งสองบัคให้เรียบร้อย
+
+      ### บัค 1 — Drag-drop reorder
+      **ไฟล์**: `src/components/DraggableListItem.tsx`
+      **Root cause**: ใน `handleDrop` (ใช้กับ HTML5 desktop drag) ส่ง `id` จาก closure ของ props ซึ่งเป็น id ของ "ตัวที่ถูกวางทับ" (drop target) ไม่ใช่ id ของ "ตัวที่ถูกลาก" (dragged item)
+      id ของตัวที่ถูกลากถูกเซ็ตไว้ใน `dataTransfer` ใน `handleDragStart` (บรรทัด `e.dataTransfer.setData('text/plain', id)`) แต่ `handleDrop` ไม่ได้อ่านออกมา
+
+      ผลกระทบ: parent `handleReorderBank` / `handleReorderPocket` ใน `src/app/banks/page.tsx` และ `src/app/pockets/page.tsx` รับ id ของตัวผิด → คำนวณ reorder ที่กลายเป็น no-op → ไม่มีการเรียก `reorderBanks` / `reorderPockets` (เพราะ early-return `if (clamped === fromIndex || clamped === fromIndex + 1) return`) → ไม่มี Supabase call, ไม่อัปเดต local state
+
+      **Fix**: ใน `handleDrop` ให้อ่าน dragged id จาก `e.dataTransfer.getData('text/plain')` แทนการใช้ `id` จาก closure แล้วส่ง id นั้นไปยัง `onReorder`
+      - ใช้ guard: ถ้า `draggedId` ว่าง/ไม่ตรงกับ id ของ element นี้เอง ก็ early-return (เพื่อกัน edge case เช่น drop นอก item)
+      - เอา `id` ออกจาก dependency array ของ useCallback ของ `handleDrop` (เพราะไม่ได้ใช้แล้ว)
+      - ห้ามแก้ touch handler (`handleTouchEnd`) — touch ใช้ `id` จาก props ถูกต้องอยู่แล้ว เพราะ touch event อยู่บน element ที่ลาก
+      - ห้ามแก้ keyboard handler — keyboard ก็ถูกต้องอยู่แล้ว
+
+      ตรวจสอบให้แน่ใจว่า Supabase update ใน `reorderBanks` / `reorderPockets` ใน `src/hooks/usePocketRouterStore.ts` ทำงานถูกต้อง (optimistic set state ก่อน แล้วค่อย update DB) — ไม่ต้องแก้ logic นี้ ยกเว้นจะเจอบัคเพิ่ม
+
+      ### บัค 2 — Logout ล้าง local state
+      **ไฟล์ที่เกี่ยวข้อง**: `src/hooks/useAuthStore.ts`, `src/hooks/usePocketRouterStore.ts`
+      **Root cause**: `useAuthStore.signOut` แค่เคลียร์ `user` ใน auth store แต่ไม่เคลียร์ banks/pockets/allocations ใน `usePocketRouterStore` ซึ่งใช้ `zustand/middleware persist` ทำให้ค้างใน localStorage
+
+      **Fix**: 
+      - เพิ่ม action `clearLocalData` (หรือชื่อที่เหมาะสม) ใน `usePocketRouterStore` ที่:
+        - ตั้ง `banks`, `pockets`, `allocations` เป็น `[]`
+        - ตั้ง `settings` กลับเป็น default (`{ currency: 'THB', storageType: 'local' }`)
+        - clear lastError
+        - เรียก `unsubscribeRealtime()` ถ้ามี channel เปิดอยู่ (defensive)
+        - เรียก `usePocketRouterStore.persist.clearStorage()` หรือใช้ `setState` ให้ persist middleware เขียน state ใหม่ลง localStorage (zustand persist จะ auto-persist เมื่อ state เปลี่ยน ดังนั้น `setState` ปกติก็พอ)
+      - ใน `useAuthStore.signOut` หลังจาก `supabase.auth.signOut()` ให้เรียก `usePocketRouterStore.getState().clearLocalData()`
+      - ระวัง circular import: ถ้า `useAuthStore` import `usePocketRouterStore` แล้วทำให้เกิดปัญหา ให้ทำ dynamic import หรือ move logic ไปยัง `ClientProviders.tsx` useEffect ที่ watch `user` ก็ได้ (เลือกวิธีที่สะอาดที่สุด)
+      - ห้ามลบ realtime channels ในตัว PocketRouterStore ตอน logout โดยไม่ตั้งใจ — การ unsubscribe ต้องเป็น idempotent
+
+      ## ข้อกำหนด
+      - อ่านไฟล์ที่เกี่ยวข้องทั้งหมดก่อนแก้ เพื่อเข้าใจ context
+      - ห้ามทำ breaking changes — public API ของ store ต้องคงเดิม
+      - ห้ามแก้ไฟล์นอกเหนือจากที่จำเป็น (DraggableListItem, useAuthStore, usePocketRouterStore — และถ้าจำเป็นจริงๆ ClientProviders)
+      - ใช้ Edit tool เท่านั้น ห้าม rewrite ไฟล์ทั้งไฟล์ถ้าไม่จำเป็น
+      - รักษา code style เดิม (ช่องว่าง, type annotations, comment style)
+      - อ่าน Next.js docs ที่เกี่ยวข้องใน `node_modules/next/dist/docs/` ก่อนถ้ามีข้อสงสัยเรื่อง Next.js 16
+
+      ## ขั้นตอนการทำงาน
+      1. อ่านไฟล์ทั้งหมดที่เกี่ยวข้อง:
+         - src/components/DraggableListItem.tsx
+         - src/app/banks/page.tsx
+         - src/app/pockets/page.tsx
+         - src/hooks/useAuthStore.ts
+         - src/hooks/usePocketRouterStore.ts
+         - src/components/ClientProviders.tsx
+      2. ยืนยัน root cause ของทั้งสองบัคจากโค้ด
+      3. แก้บัค 1 ที่ DraggableListItem.tsx (handleDrop อ่าน draggedId จาก dataTransfer)
+      4. แก้บัค 2 ที่ usePocketRouterStore.ts (เพิ่ม clearLocalData) และ useAuthStore.ts (เรียก clearLocalData ใน signOut)
+      5. ตรวจสอบ TypeScript compile ด้วย `npx tsc --noEmit` จาก D:\dev\money-tagging (ถ้าใช้เวลานานเกิน 120s ให้ข้ามและรายงาน)
+      6. รายงานไฟล์ที่แก้ + บรรทัดสำคัญ + เหตุผล
+
+      ## Deliverable
+      - ไฟล์ที่ถูกแก้ (path + สรุปการเปลี่ยนแปลง)
+      - ผล TypeScript check (ถ้ารันได้)
+      - หมายเหตุถ้ามี edge case ที่ต้องระวัง
+      - ห้าม commit git — เจ้าของจะ commit เอง
+    verify_prompt: |
+      ตรวจสอบการแก้บัค 2 ตัวนี้อย่างเป็นอิสระ (ห้ามดูสรุปของ producer อย่างเดียว ต้องอ่านโค้ดจริง):
+
+      ## บัค 1 — Drag-drop reorder
+      อ่าน `src/components/DraggableListItem.tsx` แล้วยืนยัน:
+      - [ ] `handleDrop` อ่าน dragged item id จาก `e.dataTransfer.getData('text/plain')` ไม่ใช้ `id` จาก closure
+      - [ ] `handleDrop` ส่ง draggedId ไปยัง `onReorder`
+      - [ ] มี guard ป้องกัน edge case (draggedId ว่าง, draggedId ไม่ตรงกับ item นี้)
+      - [ ] `id` ถูกเอาออกจาก dependency array ของ useCallback ของ handleDrop ถ้าไม่ได้ใช้แล้ว
+      - [ ] `handleTouchEnd` ไม่ถูกแก้ (ยังใช้ `id` จาก props ตามเดิม เพราะ touch event scoped ที่ element ที่ลาก)
+      - [ ] `handleKeyDown` ไม่ถูกแก้
+      - [ ] `handleDragStart` ยังเซ็ต `e.dataTransfer.setData('text/plain', id)` ไว้ถูกต้อง
+
+      แล้วลอง trace flow แบบนี้:
+      - เริ่มต้น banks = [A, B, C] (sorted by order)
+      - user ลาก A บนเดสก์ท็อปแล้ว drop ที่ bottom half ของ B
+      - B's handleDrop ถูกเรียก → draggedId ต้องเป็น "A" (ไม่ใช่ "B") → toIndex = 2
+      - parent handleReorderBank("A", 2) ต้องทำงาน (ไม่ early-return)
+      - result ต้องเป็น [B, C, A]
+
+      ถ้า trace ไม่ตรงตามนี้ → FAIL
+
+      ## บัค 2 — Logout clear local state
+      อ่าน `src/hooks/useAuthStore.ts` และ `src/hooks/usePocketRouterStore.ts` แล้วยืนยัน:
+      - [ ] `usePocketRouterStore` มี action ใหม่ (เช่น `clearLocalData`) ที่ตั้ง banks/pockets/allocations = [], settings = default, และ clear lastError
+      - [ ] action นี้ทำงานกับ zustand persist ถูกต้อง (เขียน localStorage หรือ clearStorage)
+      - [ ] ถ้ามี realtime channel เปิดอยู่ ต้อง unsubscribe (idempotent — เรียกซ้ำได้ไม่ error)
+      - [ ] `useAuthStore.signOut` หลังจาก `supabase.auth.signOut()` เรียก `usePocketRouterStore.getState().clearLocalData()`
+      - [ ] ไม่มี circular import ที่จะทำให้ build fail
+      - [ ] ถ้าใช้วิธี alternate (move logic ไป ClientProviders useEffect ที่ watch user=null) ต้อง:
+        - ทำงานทันทีเมื่อ user กลายเป็น null
+        - ไม่ trigger ตอน initial mount (guard ด้วย isInitialized หรือเทียบ previous user)
+        - ไม่ clear ตอน user แค่ "ยังไม่ initialized"
+
+      ลอง trace flow:
+      - user login อยู่ เห็น banks = [A, B, C] ทั้งใน memory และ localStorage (key "pocket-router-storage")
+      - user logout
+      - หลัง signOut เสร็จ → memory state ต้องเป็น banks=[], pockets=[], allocations=[], settings=default
+      - localStorage key "pocket-router-storage" ต้องถูกเขียนทับด้วย state ว่าง หรือถูก clear ออก
+      - user login กลับเข้ามาใหม่ ต้องเห็น state ว่าง (ไม่ใช่ข้อมูลเก่า)
+
+      ถ้า trace ไม่ตรง → FAIL
+
+      ## เกณฑ์ PASS/FAIL
+      - PASS ก็ต่อเมื่อทั้ง 2 บัคผ่านเกณฑ์ครบทุกข้อ
+      - FAIL ถ้ามีข้อใดข้อหนึ่งไม่ผ่าน พร้อมบอกบรรทัด/ไฟล์ที่ผิด
+
+      รายงานผลเป็น: PASS หรือ FAIL + รายละเอียดแต่ละข้อ

@@ -190,11 +190,21 @@ export function DraggableListItem({
       e.preventDefault();
       const rect = ref.current?.getBoundingClientRect();
       if (!rect) return;
+      // The drop event fires on the element being dropped ONTO, so the closure
+      // `id` here is the drop target's id, not the dragged item's id. Read the
+      // dragged id from dataTransfer (set in handleDragStart) instead.
+      const draggedId = e.dataTransfer.getData('text/plain');
+      if (!draggedId || draggedId === id) {
+        // Drop on self, or from an unknown source (e.g. external drag) — no-op.
+        setActive(false);
+        clearOver();
+        return;
+      }
       const above = e.clientY < rect.top + rect.height / 2;
       const toIndex = above ? index : index + 1;
       setActive(false);
       clearOver();
-      onReorder(id, toIndex);
+      onReorder(draggedId, toIndex);
     },
     [id, index, onReorder, setActive, clearOver]
   );
