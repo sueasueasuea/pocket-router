@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
+import { useHasHydrated } from '@/hooks/useHasHydrated';
 import { Bank } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,7 +52,7 @@ export default function ManageBanksPage() {
     reorderBanks,
   } = usePocketRouterStore();
 
-  const [mounted, setMounted] = useState(false);
+  const hasHydrated = useHasHydrated();
 
   // Add bank dialog
   const [isAddBankOpen, setIsAddBankOpen] = useState(false);
@@ -67,8 +68,15 @@ export default function ManageBanksPage() {
   // Delete confirmation
   const [deletingBank, setDeletingBank] = useState<Bank | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
+  // --- Keyboard drag-drop a11y ---
+  // Tracks the bank currently picked up via keyboard (if any), the index the
+  // user has navigated to with arrow keys, and the latest live-region message.
+  const [keyboardPickedUpBankId, setKeyboardPickedUpBankId] = useState<string | null>(null);
+  const [keyboardTargetIndex, setKeyboardTargetIndex] = useState<number | null>(null);
+  const [bankLiveMessage, setBankLiveMessage] = useState<string>('');
+
+  const announceBank = useCallback((message: string) => {
+    setBankLiveMessage(message);
   }, []);
 
   const formatCurrency = (amount: number) => {
@@ -118,6 +126,46 @@ export default function ManageBanksPage() {
     },
     [sortedBanks, reorderBanks]
   );
+
+  // --- Keyboard a11y handlers ---
+  const handleKeyboardPickupBank = useCallback(
+    (bankId: string) => {
+      setKeyboardPickedUpBankId(bankId);
+      const idx = sortedBanks.findIndex((b) => b.id === bankId);
+      setKeyboardTargetIndex(idx === -1 ? null : idx);
+    },
+    [sortedBanks]
+  );
+
+  const handleKeyboardDropBank = useCallback(
+    async (bankId: string, toNewPosition: number) => {
+      // `toNewPosition` is the desired NEW position in the list (0..lastIndex).
+      // Convert to the insertIndex semantics expected by handleReorderBank.
+      const ids = sortedBanks.map((b) => b.id);
+      const fromIndex = ids.indexOf(bankId);
+      if (fromIndex === -1) {
+        setKeyboardPickedUpBankId(null);
+        setKeyboardTargetIndex(null);
+        return;
+      }
+      const clampedNew = Math.max(0, Math.min(toNewPosition, ids.length - 1));
+      // If moving down by ≥1, insertIndex = newPos + 1; otherwise insertIndex = newPos.
+      const insertIndex = clampedNew > fromIndex ? clampedNew + 1 : clampedNew;
+      setKeyboardPickedUpBankId(null);
+      setKeyboardTargetIndex(null);
+      await handleReorderBank(bankId, insertIndex);
+    },
+    [sortedBanks, handleReorderBank]
+  );
+
+  const handleKeyboardCancelBank = useCallback(() => {
+    setKeyboardPickedUpBankId(null);
+    setKeyboardTargetIndex(null);
+  }, []);
+
+  const handleKeyboardTargetChangeBank = useCallback((targetIndex: number) => {
+    setKeyboardTargetIndex(targetIndex);
+  }, []);
 
   const resetBankForm = () => {
     setBankName('');
@@ -179,12 +227,18 @@ export default function ManageBanksPage() {
     }
   };
 
-  if (!mounted) {
+  if (!hasHydrated) {
     return <div className="p-6">Loading...</div>;
   }
 
   return (
     <main className="flex flex-col min-h-full bg-zinc-50 dark:bg-zinc-950 pb-28">
+      {/* Live region for screen-reader announcements (keyboard drag-drop). */}
+      <h2 className="sr-only">Bank reorder status</h2>
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {bankLiveMessage}
+      </div>
+
       {/* Header */}
       <header className="bg-white dark:bg-zinc-900 sticky top-0 z-10 border-b border-zinc-100 dark:border-zinc-800 w-full">
         <div className="max-w-4xl mx-auto w-full px-6 pt-12 pb-4 flex justify-between items-center">
@@ -236,7 +290,14 @@ export default function ManageBanksPage() {
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div
+            role="listbox"
+            aria-label="Banks. Use arrow keys to reorder."
+            aria-activedescendant={
+              keyboardPickedUpBankId ? `sortable-${keyboardPickedUpBankId}` : undefined
+            }
+            className="flex flex-col gap-3"
+          >
             {sortedBanks.map((bank, index) => {
               const total = getBankTotal(bank.id);
               const pocketCount = getBankPocketCount(bank.id);
@@ -247,6 +308,17 @@ export default function ManageBanksPage() {
                   key={bank.id}
                   id={bank.id}
                   index={index}
+                  totalCount={sortedBanks.length}
+                  itemName={bank.name}
+                  isKeyboardPickedUp={keyboardPickedUpBankId === bank.id}
+                  keyboardTargetIndex={
+                    keyboardPickedUpBankId ? keyboardTargetIndex : null
+                  }
+                  onKeyboardPickup={handleKeyboardPickupBank}
+                  onKeyboardDrop={handleKeyboardDropBank}
+                  onKeyboardCancel={handleKeyboardCancelBank}
+                  onKeyboardTargetChange={handleKeyboardTargetChangeBank}
+                  onAnnounce={announceBank}
                   onReorder={handleReorderBank}
                   className="rounded-2xl"
                 >
@@ -328,7 +400,7 @@ export default function ManageBanksPage() {
                           <div className="flex flex-col border-l border-white/10">
                             <button
                               aria-label="Edit bank"
-                              className="flex-1 flex items-center justify-center px-3 hover:bg-white/10 transition-colors duration-150"
+                              className="flex-1 flex items-center justify-center px-3 min-h-[44px] min-w-[44px] hover:bg-white/10 transition-colors duration-150"
                               onClick={() => openEditBankDialog(bank)}
                             >
                               <Edit2 className="w-4 h-4 text-white/80" />
@@ -336,7 +408,7 @@ export default function ManageBanksPage() {
                             <div className="border-t border-white/10" />
                             <button
                               aria-label="Delete bank"
-                              className="flex-1 flex items-center justify-center px-3 hover:bg-rose-500/20 transition-colors duration-150"
+                              className="flex-1 flex items-center justify-center px-3 min-h-[44px] min-w-[44px] hover:bg-rose-500/20 transition-colors duration-150"
                               onClick={() => handleDeleteBank(bank)}
                             >
                               <Trash2 className="w-4 h-4 text-white/80" />

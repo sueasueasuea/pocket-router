@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/hooks/useAuthStore';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
+import { useHasHydrated } from '@/hooks/useHasHydrated';
 import { supabase } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,8 +36,8 @@ export default function LoginPage() {
         alert('Check your email for the confirmation link.');
       }
       router.push('/');
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during authentication');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred during authentication');
     } finally {
       setIsLoading(false);
     }
@@ -51,30 +52,18 @@ export default function LoginPage() {
         },
       });
       if (error) throw error;
-    } catch (err: any) {
-      setError(err.message || 'Failed to initialize Google login');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to initialize Google login');
     }
   };
 
   const user = useAuthStore((state) => state.user);
   const signOut = useAuthStore((state) => state.signOut);
-  const { settings, updateSettings } = usePocketRouterStore();
-  const [currency, setCurrency] = useState(settings.currency);
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (mounted) {
-      setCurrency(settings.currency);
-    }
-  }, [settings.currency, mounted]);
-
-  const handleSaveCurrency = () => {
-    updateSettings({ currency });
-  };
+  // `hasHydrated` gates the profile / currency editor so it doesn't flash the
+  // default currency before Zustand has finished reading localStorage.
+  // See `useHasHydrated` for the rationale.
+  const hasHydrated = useHasHydrated();
 
   if (user) {
     return (
@@ -90,37 +79,18 @@ export default function LoginPage() {
               <p className="font-medium">{user.email}</p>
             </div>
 
-            {/* Currency Settings */}
+            {/* Currency Settings — keyed on hydration so the draft is
+                initialized from the persisted value rather than the default. */}
             <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
               <div className="flex items-center gap-2 mb-3">
                 <Globe className="w-4 h-4 text-zinc-500" />
                 <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Settings</span>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="profile-currency">Default Currency</Label>
-                <div className="flex gap-2">
-                  <Select value={currency} onValueChange={(val) => setCurrency(val ?? 'THB')}>
-                    <SelectTrigger id="profile-currency" className="flex-1">
-                      <SelectValue placeholder="Select Currency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="THB">THB (฿)</SelectItem>
-                      <SelectItem value="USD">USD ($)</SelectItem>
-                      <SelectItem value="EUR">EUR (€)</SelectItem>
-                      <SelectItem value="GBP">GBP (£)</SelectItem>
-                      <SelectItem value="JPY">JPY (¥)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    size="sm"
-                    className="rounded-full"
-                    onClick={handleSaveCurrency}
-                    disabled={currency === settings.currency}
-                  >
-                    Save
-                  </Button>
-                </div>
-              </div>
+              {hasHydrated ? (
+                <CurrencyEditor key="hydrated" />
+              ) : (
+                <CurrencyEditorSkeleton />
+              )}
             </div>
 
             <Button 
@@ -253,6 +223,58 @@ export default function LoginPage() {
         <Button variant="link" className="text-zinc-500 text-sm" onClick={() => router.push('/')}>
           Continue as guest (Offline mode)
         </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Currency draft editor. Kept in its own component so it can be remounted
+ * (via `key`) once Zustand hydration completes — that way `useState` can
+ * initialize the draft directly from the persisted `settings.currency`
+ * without needing a `setState`-in-`useEffect` sync.
+ */
+function CurrencyEditor() {
+  const settings = usePocketRouterStore((state) => state.settings);
+  const updateSettings = usePocketRouterStore((state) => state.updateSettings);
+  const [currency, setCurrency] = useState(settings.currency);
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="profile-currency">Default Currency</Label>
+      <div className="flex gap-2">
+        <Select value={currency} onValueChange={(val) => setCurrency(val ?? 'THB')}>
+          <SelectTrigger id="profile-currency" className="flex-1">
+            <SelectValue placeholder="Select Currency" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="THB">THB (฿)</SelectItem>
+            <SelectItem value="USD">USD ($)</SelectItem>
+            <SelectItem value="EUR">EUR (€)</SelectItem>
+            <SelectItem value="GBP">GBP (£)</SelectItem>
+            <SelectItem value="JPY">JPY (¥)</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          size="sm"
+          className="rounded-full"
+          onClick={() => updateSettings({ currency })}
+          disabled={currency === settings.currency}
+        >
+          Save
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function CurrencyEditorSkeleton() {
+  return (
+    <div className="space-y-2" aria-hidden>
+      <div className="h-4 w-24 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+      <div className="flex gap-2">
+        <div className="h-9 flex-1 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+        <div className="h-9 w-16 bg-zinc-200 dark:bg-zinc-800 rounded-full animate-pulse" />
       </div>
     </div>
   );

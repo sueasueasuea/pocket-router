@@ -1,0 +1,123 @@
+version: 1
+plan:
+  name: "ตรวจสอบแอป Pocket Router ครบทุกมิติ"
+  max_concurrency: 1
+  max_consecutive_failures: 2
+  max_cycles: 5
+  auto_reject_retries: 1
+  verifier_config:
+    default_verifiers: [verifier]
+    audit_sample_rate: 0.0
+tasks:
+  - id: app-audit
+    title: "ตรวจสอบแอป Pocket Router (Next.js 16 + Supabase)"
+    role: verify-as-task
+    assigned_to: verifier
+    max_retries: 1
+    prompt: |
+      คุณคือ Verifier ทำหน้าที่ตรวจสอบแอป "Pocket Router" (Next.js 16.2.9 + React 19.2.4 + Supabase + Zustand + Tailwind 4 + shadcn base-nova) ใน workspace D:\dev\money-tagging
+
+      ## บริบทของแอป
+      - แอปจัดการเงิน "Pocket Router" — ติดตามการจัดสรรเงินระหว่างธนาคาร (banks) และกระเป๋า (pockets)
+      - ใช้ Supabase สำหรับ auth + data, Zustand สำหรับ client state
+      - Routes: /, /login, /auth/callback, /banks, /pockets, /pockets/[id]
+      - ไฟล์สำคัญ:
+        - src/app/{page,layout}.tsx
+        - src/app/{auth/callback,login,banks/page,pockets/page,pockets/[id]}/...
+        - src/hooks/useAuthStore.ts, usePocketRouterStore.ts
+        - src/components/*.tsx (BankCard, PocketCard, BottomNav, ErrorModal, ClientProviders, DashboardSummary, TransferDialog, ConfirmDeleteDialog, DraggableBankAllocationCard, DraggableListItem)
+        - src/lib/utils.ts
+        - .env.local (Supabase keys — ห้ามแก้ไข ห้าม dump ค่า secret ออกมา)
+
+      ## สิ่งที่ต้องตรวจ (รันจริง ห้ามอ่านอย่างเดียว)
+
+      ### 1. Build / Type / Lint
+      - `cd D:\dev\money-tagging` แล้วรัน:
+        - `npm run build` — ต้องผ่าน ถ้า fail ให้รายงาน error แรก ๆ ครบ
+        - `npm run lint` — รายงาน warning/error ทั้งหมด
+        - `npx tsc --noEmit` — รายงาน type errors
+      - ถ้า `node_modules` ยังไม่พร้อม ให้ `npm install` ก่อน (อาจใช้เวลานาน — ตั้ง timeout ให้เหมาะสม)
+
+      ### 2. README TODO ทั้ง 4 ข้อ
+      ตรวจสถานะจริงของ TODO เหล่านี้ (อ่านไฟล์ที่เกี่ยวข้อง + ค้นหาใน codebase):
+      1. "Delete allocations, Improve accessibility on mobile @pocket/[id]"
+      2. "Remove right arrow icon on pocket card @/pockets, prevent user missed click"
+      3. "Add bank icon on bank card @/banks"
+      4. "Remember order /banks and /pockets and both can re-arrange order by drag & drop"
+      สำหรับแต่ละข้อ: ระบุสถานะ (เสร็จ / ยังไม่เสร็จ / ทำบางส่วน) + หลักฐาน (ไฟล์:บรรทัด)
+
+      ### 3. Security & Config
+      - ตรวจว่า `.env.local` ถูก git-ignore (อ่าน `.gitignore` — ห้ามอ่านค่าใน `.env.local`)
+      - ดูว่า Supabase anon key / service role key ถูกใช้ถูกที่ (anon ใน client, service role เฉพาะ server)
+      - ตรวจ callback route (`src/app/auth/callback/`) ว่าจัดการ OAuth code exchange ถูกต้อง
+      - ตรวจไม่ให้มี secret รั่วใน client bundle (`grep -r "service_role"` ใน src/)
+
+      ### 4. Next.js 16 / React 19 antipatterns
+      - Server vs Client component boundary ถูกต้อง (ดู 'use client' directive)
+      - Hydration mismatch risk — ใช้ `mounted` pattern ถูกต้องหรือไม่
+      - Async params (Next 15+) ใน `pockets/[id]/page.tsx` — `params` ต้อง await
+      - ไม่มี `useEffect` ที่ fetch data ที่ควรเป็น server component
+      - Tailwind v4 syntax (ดู globals.css) ใช้ @theme / @import ถูกต้อง
+
+      ### 5. Zustand store
+      - ตรวจ persist middleware (มี localStorage hydration ถูกต้องไหม)
+      - ตรวจ actions ของ `usePocketRouterStore` ไม่มี side-effect ที่อันตราย
+      - ตรวจ error handling ใน async actions
+
+      ### 6. UX / Accessibility quick scan
+      - ปุ่มที่กดได้แต่ไม่ใช่ `<button>` (a11y)
+      - Form inputs มี label
+      - Color contrast (ดูใน dark mode tokens)
+
+      ## รูปแบบรายงาน (เขียนเป็นไฟล์เดียว)
+
+      สร้างไฟล์ `D:\dev\money-tagging\.mavis\plans\app-audit-report.md` โดยใช้ Markdown หัวข้อนี้:
+
+      ```
+      # App Audit Report — Pocket Router
+      วันที่: <วันเวลาปัจจุบัน Asia/Bangkok>
+      Workspace: D:\dev\money-tagging
+
+      ## 1. Verdict
+      <PASS หรือ FAIL หรือ PASS_WITH_WARNINGS — สรุปสั้น 3-5 บรรทัด>
+
+      ## 2. Build / Type / Lint
+      - Build: <PASS/FAIL> — หลักฐาน <last 20 บรรทัด output>
+      - Lint: <PASS/FAIL> — จำนวน warning/error
+      - TypeScript: <PASS/FAIL> — จำนวน error
+
+      ## 3. README TODO Status
+      | # | TODO | สถานะ | หลักฐาน |
+      |---|------|--------|--------|
+      | 1 | Delete allocations, a11y @pocket/[id] | DONE/PARTIAL/MISSING | file:line |
+      | 2 | Remove right arrow @/pockets | DONE/PARTIAL/MISSING | file:line |
+      | 3 | Add bank icon @/banks | DONE/PARTIAL/MISSING | file:line |
+      | 4 | Remember order + drag & drop /banks /pockets | DONE/PARTIAL/MISSING | file:line |
+
+      ## 4. Security Findings
+      - <list ปัญหา หรือ "ไม่พบปัญหา">
+
+      ## 5. Next.js / React Antipatterns
+      - <list ปัญหา พร้อมไฟล์:บรรทัด>
+
+      ## 6. Zustand Store Notes
+      - <list ปัญหา/ข้อสังเกต>
+
+      ## 7. UX / Accessibility
+      - <list ปัญหา>
+
+      ## 8. Critical Bugs (block release)
+      - <list หรือ "ไม่มี">
+
+      ## 9. Recommendations (ไม่ block แต่ควรแก้)
+      - <list เรียงตาม priority>
+
+      ## 10. Evidence
+      - <ไฟล์ที่อ่าน คำสั่งที่รัน ผลลัพธ์ที่สำคัญ>
+      ```
+
+      ## Stop condition
+      ทันทีที่เขียน report เสร็จ + return verdict (PASS / PASS_WITH_WARNINGS / FAIL) กลับมาในข้อความ report ให้ root session
+      - ห้ามแก้ไข source code (verify-as-task ห้ามแก้ไข)
+      - ห้ามอ่าน `.env.local` (block โดย permission)
+      - ถ้า build ใช้เวลานาน ให้ใช้ timeout >= 10 นาทีสำหรับ npm run build

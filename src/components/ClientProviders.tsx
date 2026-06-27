@@ -3,14 +3,11 @@
 import { useEffect } from 'react';
 import { useAuthStore } from '@/hooks/useAuthStore';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
-import { usePathname, useRouter } from 'next/navigation';
 
 export function ClientProviders({ children }: { children: React.ReactNode }) {
   const initialize = useAuthStore((state) => state.initialize);
   const user = useAuthStore((state) => state.user);
   const isInitialized = useAuthStore((state) => state.isInitialized);
-  const pathname = usePathname();
-  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = initialize();

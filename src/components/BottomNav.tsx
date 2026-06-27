@@ -35,12 +35,19 @@ export function BottomNav() {
         <nav className="flex justify-around items-center p-3">
           {links.map((link) => {
             const Icon = link.icon;
-            const isActive = pathname === link.href;
+            // Use exact match for "/" to avoid matching every route; for nested routes,
+            // active when the current path is the route OR a child of it (e.g. /pockets/123
+            // should highlight the "Pockets" tab).
+            const isActive =
+              link.href === '/'
+                ? pathname === '/'
+                : !!pathname && pathname.startsWith(link.href);
 
             return (
               <Link
                 key={link.href}
                 href={link.href}
+                aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   "flex flex-col items-center justify-center w-16 gap-1 transition-colors duration-200",
                   isActive ? "text-primary" : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-300"

@@ -787,6 +787,15 @@ export const usePocketRouterStore = create<PocketRouterState>()(
     }),
     {
       name: 'pocket-router-storage',
+      // Only persist domain data + settings. Transient fields (isLoading,
+      // lastError, realtime channel refs) live outside this store so they
+      // never accidentally land in localStorage and survive a refresh.
+      partialize: (state) => ({
+        banks: state.banks,
+        pockets: state.pockets,
+        allocations: state.allocations,
+        settings: state.settings,
+      }),
     }
   )
 );

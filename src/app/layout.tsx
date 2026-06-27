@@ -15,8 +15,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // Allow pinch-to-zoom — required for a11y (WCAG 1.4.4 Resize Text).
+  // Financial apps in particular need users to be able to zoom on numbers.
   themeColor: "#f4f4f5", // zinc-100
 };
 

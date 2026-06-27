@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, use } from 'react';
+import { useState, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
+import { useHasHydrated } from '@/hooks/useHasHydrated';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,7 +38,7 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
     transferBetweenBanks,
   } = usePocketRouterStore();
 
-  const [mounted, setMounted] = useState(false);
+  const hasHydrated = useHasHydrated();
 
   // Drag state
   const [draggingBankId, setDraggingBankId] = useState<string | null>(null);
@@ -59,8 +60,15 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
   // Remove allocation dialog
   const [removingAllocBankId, setRemovingAllocBankId] = useState<string | null>(null);
 
-  useEffect(() => {
-    setMounted(true);
+  // --- Keyboard drag-drop a11y ---
+  // Tracks the bank currently picked up via keyboard, the bank the user has
+  // navigated to with arrow keys, and the latest live-region message.
+  const [keyboardPickedUpBankId, setKeyboardPickedUpBankId] = useState<string | null>(null);
+  const [keyboardTargetBankId, setKeyboardTargetBankId] = useState<string | null>(null);
+  const [allocLiveMessage, setAllocLiveMessage] = useState<string>('');
+
+  const announceAlloc = useCallback((message: string) => {
+    setAllocLiveMessage(message);
   }, []);
 
   const pocket = pockets.find((p) => p.id === pocketId);
@@ -68,11 +76,6 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
   const totalBalance = pocketAllocations.reduce((sum, a) => sum + a.amount, 0);
   const hasTarget = pocket?.targetAmount !== undefined && pocket.targetAmount > 0;
   const progress = hasTarget ? Math.min(100, Math.round((totalBalance / pocket!.targetAmount!) * 100)) : 0;
-
-  // Banks that DON'T have an allocation in this pocket yet (for the add dialog)
-  const availableBanksForAlloc = banks.filter(
-    (b) => !pocketAllocations.some((a) => a.bankId === b.id)
-  );
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -114,6 +117,37 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
     },
     [draggingBankId]
   );
+
+  // --- Keyboard a11y handlers ---
+  const handleKeyboardPickupBank = useCallback((bankId: string) => {
+    setKeyboardPickedUpBankId(bankId);
+    setKeyboardTargetBankId(null);
+  }, []);
+
+  const handleKeyboardDropBank = useCallback(
+    (targetBankId: string) => {
+      if (
+        keyboardPickedUpBankId &&
+        keyboardPickedUpBankId !== targetBankId
+      ) {
+        setTransferFromBankId(keyboardPickedUpBankId);
+        setTransferToBankId(targetBankId);
+        setTransferOpen(true);
+      }
+      setKeyboardPickedUpBankId(null);
+      setKeyboardTargetBankId(null);
+    },
+    [keyboardPickedUpBankId]
+  );
+
+  const handleKeyboardCancelBank = useCallback(() => {
+    setKeyboardPickedUpBankId(null);
+    setKeyboardTargetBankId(null);
+  }, []);
+
+  const handleKeyboardTargetChangeBank = useCallback((targetBankId: string) => {
+    setKeyboardTargetBankId(targetBankId);
+  }, []);
 
   // Transfer confirm
   const handleTransferConfirm = async (amount: number) => {
@@ -172,7 +206,7 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  if (!mounted) {
+  if (!hasHydrated) {
     return <div className="p-6">Loading...</div>;
   }
 
@@ -206,6 +240,12 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       )}
+
+      {/* Live region for screen-reader announcements (keyboard drag-drop). */}
+      <h2 className="sr-only">Bank allocation transfer status</h2>
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {allocLiveMessage}
+      </div>
 
       {/* Header */}
       <header className="bg-white dark:bg-zinc-900 sticky top-0 z-10 border-b border-zinc-100 dark:border-zinc-800 w-full">
@@ -291,7 +331,7 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
                 No allocations yet
               </p>
               <p className="text-xs text-zinc-500 max-w-[220px] mt-1">
-                Add your first bank allocation to start tracking where this pocket's money lives.
+                Add your first bank allocation to start tracking where this pocket&apos;s money lives.
               </p>
             </div>
             <Button
@@ -307,7 +347,14 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
             </Button>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div
+            role="listbox"
+            aria-label="Bank allocations. Use arrow keys to choose a target bank for transfer."
+            aria-activedescendant={
+              keyboardPickedUpBankId ? `bank-alloc-${keyboardPickedUpBankId}` : undefined
+            }
+            className="flex flex-col gap-3"
+          >
             {pocketAllocations.map((alloc) => {
               const bank = banks.find((b) => b.id === alloc.bankId);
               if (!bank) return null;
@@ -332,6 +379,16 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
                     isDragging={draggingBankId === bank.id}
                     isDragOver={dragOverBankId === bank.id}
                     onRemove={() => handleDeleteBankFromPocket(bank.id)}
+                    isKeyboardPickedUp={keyboardPickedUpBankId === bank.id}
+                    keyboardTargetBankId={
+                      keyboardPickedUpBankId ? keyboardTargetBankId : null
+                    }
+                    totalCount={pocketAllocations.length}
+                    onKeyboardPickup={handleKeyboardPickupBank}
+                    onKeyboardDrop={handleKeyboardDropBank}
+                    onKeyboardCancel={handleKeyboardCancelBank}
+                    onKeyboardTargetChange={handleKeyboardTargetChangeBank}
+                    onAnnounce={announceAlloc}
                   />
                 </div>
               );
@@ -357,7 +414,15 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
       {/* Transfer Dialog */}
       <TransferDialog
         open={transferOpen}
-        onOpenChange={setTransferOpen}
+        onOpenChange={(open) => {
+          setTransferOpen(open);
+          // Always reset keyboard pickup when the dialog closes (whether
+          // confirmed or dismissed) so the user can pick up again.
+          if (!open) {
+            setKeyboardPickedUpBankId(null);
+            setKeyboardTargetBankId(null);
+          }
+        }}
         fromBank={fromBank}
         toBank={toBank}
         maxAmount={maxTransferAmount}
@@ -371,7 +436,7 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
           <DialogHeader>
             <DialogTitle>Add Bank Allocation</DialogTitle>
             <DialogDescription>
-              Route money from "{pocket.name}" to a bank account.
+              Route money from &ldquo;{pocket.name}&rdquo; to a bank account.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddAllocation} className="space-y-4">

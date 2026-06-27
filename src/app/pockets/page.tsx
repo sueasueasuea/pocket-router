@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
+import { useHasHydrated } from '@/hooks/useHasHydrated';
 import { Pocket } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +25,7 @@ const PRESET_EMOJIS = [
 
 export default function PocketsPage() {
   const { pockets, allocations, settings, addPocket, updatePocket, deletePocket, reorderPockets } = usePocketRouterStore();
-  const [mounted, setMounted] = useState(false);
+  const hasHydrated = useHasHydrated();
   const router = useRouter();
 
   // Dialog States
@@ -33,14 +34,19 @@ export default function PocketsPage() {
   const [editingPocket, setEditingPocket] = useState<Pocket | null>(null);
   const [deletingPocketId, setDeletingPocketId] = useState<string | null>(null);
 
+  // --- Keyboard drag-drop a11y ---
+  const [keyboardPickedUpPocketId, setKeyboardPickedUpPocketId] = useState<string | null>(null);
+  const [keyboardPocketTargetIndex, setKeyboardPocketTargetIndex] = useState<number | null>(null);
+  const [pocketLiveMessage, setPocketLiveMessage] = useState<string>('');
+
+  const announcePocket = useCallback((message: string) => {
+    setPocketLiveMessage(message);
+  }, []);
+
   // Form States
   const [name, setName] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
   const [icon, setIcon] = useState(PRESET_EMOJIS[0]);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Sort by user-defined order, fall back to creation time for legacy items.
   const sortedPockets = useMemo(
@@ -70,7 +76,44 @@ export default function PocketsPage() {
     [sortedPockets, reorderPockets]
   );
 
-  if (!mounted) return <div className="p-6">Loading...</div>;
+  // --- Keyboard a11y handlers ---
+  const handleKeyboardPickupPocket = useCallback(
+    (pocketId: string) => {
+      setKeyboardPickedUpPocketId(pocketId);
+      const idx = sortedPockets.findIndex((p) => p.id === pocketId);
+      setKeyboardPocketTargetIndex(idx === -1 ? null : idx);
+    },
+    [sortedPockets]
+  );
+
+  const handleKeyboardDropPocket = useCallback(
+    async (pocketId: string, toNewPosition: number) => {
+      const ids = sortedPockets.map((p) => p.id);
+      const fromIndex = ids.indexOf(pocketId);
+      if (fromIndex === -1) {
+        setKeyboardPickedUpPocketId(null);
+        setKeyboardPocketTargetIndex(null);
+        return;
+      }
+      const clampedNew = Math.max(0, Math.min(toNewPosition, ids.length - 1));
+      const insertIndex = clampedNew > fromIndex ? clampedNew + 1 : clampedNew;
+      setKeyboardPickedUpPocketId(null);
+      setKeyboardPocketTargetIndex(null);
+      await handleReorderPocket(pocketId, insertIndex);
+    },
+    [sortedPockets, handleReorderPocket]
+  );
+
+  const handleKeyboardCancelPocket = useCallback(() => {
+    setKeyboardPickedUpPocketId(null);
+    setKeyboardPocketTargetIndex(null);
+  }, []);
+
+  const handleKeyboardTargetChangePocket = useCallback((targetIndex: number) => {
+    setKeyboardPocketTargetIndex(targetIndex);
+  }, []);
+
+  if (!hasHydrated) return <div className="p-6">Loading...</div>;
 
   const handleAddPocket = (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,6 +188,12 @@ export default function PocketsPage() {
 
   return (
     <main className="flex flex-col min-h-full bg-zinc-50 dark:bg-zinc-950 pb-8">
+      {/* Live region for screen-reader announcements (keyboard drag-drop). */}
+      <h2 className="sr-only">Pocket reorder status</h2>
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {pocketLiveMessage}
+      </div>
+
       {/* Header */}
       <header className="bg-white dark:bg-zinc-900 sticky top-0 z-10 border-b border-zinc-100 dark:border-zinc-800 w-full">
         <div className="max-w-4xl mx-auto w-full px-6 pt-12 pb-4 flex justify-between items-center">
@@ -183,7 +232,14 @@ export default function PocketsPage() {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div
+            role="listbox"
+            aria-label="Pockets. Use arrow keys to reorder."
+            aria-activedescendant={
+              keyboardPickedUpPocketId ? `sortable-${keyboardPickedUpPocketId}` : undefined
+            }
+            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+          >
             {sortedPockets.map((pocket, index) => {
               const balance = getPocketBalance(pocket.id);
               const hasTarget = pocket.targetAmount !== undefined && pocket.targetAmount > 0;
@@ -194,6 +250,17 @@ export default function PocketsPage() {
                   key={pocket.id}
                   id={pocket.id}
                   index={index}
+                  totalCount={sortedPockets.length}
+                  itemName={pocket.name}
+                  isKeyboardPickedUp={keyboardPickedUpPocketId === pocket.id}
+                  keyboardTargetIndex={
+                    keyboardPickedUpPocketId ? keyboardPocketTargetIndex : null
+                  }
+                  onKeyboardPickup={handleKeyboardPickupPocket}
+                  onKeyboardDrop={handleKeyboardDropPocket}
+                  onKeyboardCancel={handleKeyboardCancelPocket}
+                  onKeyboardTargetChange={handleKeyboardTargetChangePocket}
+                  onAnnounce={announcePocket}
                   onReorder={handleReorderPocket}
                   className="rounded-2xl"
                 >
@@ -221,19 +288,19 @@ export default function PocketsPage() {
                             aria-label="Edit pocket"
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 rounded-full"
+                            className="h-11 w-11 rounded-full"
                             onClick={(e) => { e.stopPropagation(); openEditDialog(pocket); }}
                           >
-                            <Edit2 className="w-3.5 h-3.5 text-zinc-500" />
+                            <Edit2 className="w-4 h-4 text-zinc-500" />
                           </Button>
                           <Button
                             aria-label="Delete pocket"
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 rounded-full hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                            className="h-11 w-11 rounded-full hover:bg-rose-50 dark:hover:bg-rose-950/20"
                             onClick={(e) => { e.stopPropagation(); handleDeletePocket(pocket.id); }}
                           >
-                            <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                            <Trash2 className="w-4 h-4 text-rose-500" />
                           </Button>
                           {/* Drag handle (visual affordance + drag start on desktop). */}
                           <span

@@ -1,0 +1,153 @@
+version: 1
+plan:
+  name: 'Drag-drop keyboard a11y สำหรับ Bank/Allocation lists'
+  max_concurrency: 2
+  max_consecutive_failures: 2
+  max_cycles: 6
+  auto_reject_retries: 1
+  verifier_config:
+    default_verifiers: [verifier]
+    audit_sample_rate: 0.0
+tasks:
+  - id: dragdrop-keyboard-a11y
+    title: 'Drag-drop keyboard a11y + live region (2 components, 2 consumers)'
+    assigned_to: coder
+    verified_by: verifier
+    max_retries: 2
+    prompt: |-
+      ## Goal
+      เพิ่ม keyboard accessibility ให้กับ drag-drop UI ทั้งสองจุดในโปรเจกต์ money-tagging
+      (D:\dev\money-tagging) ปัจจุบันรองรับเฉพาะ mouse + touch เท่านั้น — screen-reader
+      users และ keyboard-only users ใช้งานไม่ได้.
+
+      ## Files to read first (mandatory context)
+      - src/components/DraggableBankAllocationCard.tsx — การ์ดที่ลากใน pocket detail
+        เพื่อสลับลำดับ bank allocation (DnD model: drop ON a target bankId)
+      - src/components/DraggableListItem.tsx — wrapper ที่ใช้ในหน้า Banks
+        เพื่อ reorder ลำดับธนาคาร (DnD model: drop at insert index 0..length)
+      - src/app/pockets/[id]/page.tsx — consumer ของ DraggableBankAllocationCard
+      - src/app/banks/page.tsx — consumer ของ DraggableListItem
+
+      ## Required behavior (both components)
+
+      1. **Pick-up**: เมื่อ card focus ได้ และ user กด `Space` หรือ `Enter`
+         → เข้า "picked up" mode. ใช้ ARIA state ประกาศสถานะ (`aria-grabbed="true"`
+         บน DraggableListItem, `aria-pressed` หรือ `aria-describedby` บน card
+         ของ DraggableBankAllocationCard). ห้าม trigger native HTML5 dragstart
+         จาก Space/Enter — มันจะ conflict กับ native keyboard activation.
+
+      2. **Move**: ใน picked-up mode
+         - `ArrowUp` → move pointer ไปยัง previous sibling
+         - `ArrowDown` → move pointer ไปยัง next sibling
+         - `Home` → first sibling
+         - `End` → last sibling
+         - Visual indicator ต้องตาม (ใช้ `dropAbove`/`dropBelow` หรือ equivalent)
+         - `aria-activedescendant` บน listbox role (ถ้าเพิ่ม role) หรือ focus
+           management ที่เหมาะสม
+
+      3. **Drop**: กด `Space`/`Enter` อีกครั้งใน picked-up mode
+         - DraggableListItem → เรียก `onReorder(draggedId, insertIndex)` โดยใช้
+           insertIndex = index ของ activedescendant (ก่อนหน้า) หรือ
+           activedescendant.index + 1 (ตัวถัดไป) ตามทิศของ drop indicator
+         - DraggableBankAllocationCard → เรียก `onDrop(activeTargetBankId)`
+           โดยใช้ `activeTargetBankId` จาก activedescendant
+         - ออกจาก picked-up mode, ล้าง visual indicator
+
+      4. **Cancel**: กด `Escape` → ออกจาก picked-up mode โดยไม่เรียก reorder/drop
+         และ return focus ไปยัง card ที่ picked up เดิม
+
+      5. **Live region**: ทั้งสอง consumer page (pockets/[id] และ banks) ต้องมี
+         `<div role="status" aria-live="polite" className="sr-only">` ที่อัปเดต
+         ข้อความเป็นภาษาอังกฤษ เช่น:
+         - "Picked up SCB Savings. Use arrow keys to move. Press Enter to drop,
+            Escape to cancel."
+         - "Moved to position 2 of 5. Press Enter to drop."
+         - "Dropped. SCB Savings is now at position 2."
+         - "Cancelled. SCB Savings returned to original position."
+         - "Cannot move further up." / "Cannot move further down."
+         Pattern การส่ง announcement จาก child ขึ้น parent ทำได้หลายแบบ —
+         เลือกแบบที่เข้ากับ codebase ที่มีอยู่ (เช่น callback prop, context,
+         หรือ lift state ขึ้น parent).
+
+      6. **Mouse/touch behavior**: ห้ามเปลี่ยน — HTML5 dragstart/dragover/drop และ
+         touch handlers ที่มีอยู่ต้องทำงานเหมือนเดิม.
+
+      7. **Touch-target**: ตัว card ต้อง focusable — ใส่ `tabIndex={0}` บน root element
+         ถ้ายังไม่มี.
+
+      ## Constraints
+      - ห้าม introduce library ใหม่ (zustand, react, lucide-react, next มีอยู่แล้วพอ)
+      - ใช้ TypeScript strict — ห้าม `any`
+      - ใช้ `unknown` + `instanceof Error` pattern ถ้าต้อง catch
+      - ทุก keyboard handler ต้อง `preventDefault()` เพื่อไม่ให้ scroll page
+      - ทุก consumer page ต้องมี `<h1>` หรือ heading ที่ screen reader ใช้ announce
+        context ของ live region (ถ้ายังไม่มี ให้เพิ่มแบบ sr-only)
+      - ห้ามแก้ test setup — โปรเจกต์ไม่มี test runner
+
+      ## Verification you must run before reporting done
+      ทำตามลำดับ — ทั้งสามคำสั่งต้องผ่าน:
+      ```
+      cd D:\dev\money-tagging
+      npx tsc --noEmit
+      npx eslint src --max-warnings=0
+      npm run build
+      ```
+      ถ้า build fail (เหมือนรอบก่อนที่ useHasHydrated ทำ SSR crash) ให้แก้ทันที —
+      เป็นเรื่อง SSR/SSG compatibility ห้ามปล่อย build fail.
+
+      ## Stop condition
+      รายงาน:
+      1. ไฟล์ที่แก้/สร้าง (พร้อมบรรทัดคร่าว ๆ ว่าแก้อะไร)
+      2. ผล tsc / eslint / build (ต้องผ่านทั้งสาม)
+      3. Keyboard interaction map (key → action) สำหรับแต่ละ component
+      4. Live region message catalog (ตัวอย่างข้อความที่จะประกาศ)
+    verify_prompt: |-
+      ## Verification goal
+      Adversarial check ว่า keyboard a11y implementation ตรงตามสเปก และไม่ break
+      mouse/touch behavior เดิม.
+
+      ## Independent checks (must do, not just re-read diff)
+      1. **Run the code** — execute from D:\dev\money-tagging:
+         - `npx tsc --noEmit`
+         - `npx eslint src --max-warnings=0`
+         - `npm run build`
+         ทั้งสามต้อง exit 0. ถ้าใดคำสั่งใด fail → FAIL ทันที พร้อมแปะ error log
+
+      2. **Static a11y inspection** — เปิดไฟล์ทั้งสอง component และ verify:
+         - มี keyboard handler ครบ (Space/Enter pick+drop, ArrowUp/Down move,
+           Home/End, Escape)
+         - มี `tabIndex={0}` หรือเป็น element ที่ focus ได้โดยธรรมชาติ
+         - มี `aria-grabbed` หรือ `aria-pressed` หรือ `aria-describedby` ระบุสถานะ
+         - ทุก handler เรียก `preventDefault()` ที่จำเป็น (โดยเฉพาะ Space ที่จะ scroll page)
+         - Live region มี `role="status"` + `aria-live="polite"` + `sr-only` class
+         - มี heading context ใกล้ live region (sr-only h1/h2 ก็ได้)
+
+      3. **Mouse/touch preservation** — ยืนยันว่า HTML5 drag handlers
+         (onDragStart/onDragOver/onDrop) และ touch handlers ยังครบ ไม่ถูกลบ
+         หรือ short-circuit
+
+      4. **Logic attack** — re-read state machine แล้วลองหา edge case:
+         - กด Space ใน picked-up mode โดยไม่มี activedescendant → ห้าม crash
+         - กด ArrowUp ที่ first item → ห้าม crash, ต้องมี announcement "Cannot move
+           further up."
+         - กด ArrowDown ที่ last item → เช่นเดียวกัน
+         - กด Escape ขณะไม่ได้ picked up → no-op ปลอดภัย
+         - มี 1 item อยู่ใน list → arrows ต้องไม่ทำอะไร หรือ announce "Cannot move"
+
+      5. **Build output** — ดู .next output ต้องไม่มี prerender error สำหรับ
+         /banks หรือ /pockets/[id] (เคยเจอในรอบก่อน)
+
+      ## PASS criteria (all must be true)
+      - คำสั่ง lint/tsc/build ทั้งสามผ่าน
+      - Keyboard interaction map ครบทั้ง 7 จุด (Pick, Move Up/Down, Home/End,
+        Drop, Cancel)
+      - Live region มีจริงและ reachable จาก code path ของ picked-up mode
+      - Mouse/touch DnD ยังทำงาน (ยืนยันจาก code presence ไม่ใช่แค่ visual diff)
+      - Edge cases 4 ข้อข้างบนรอด
+
+      ## FAIL output format
+      ระบุให้ชัดว่า:
+      - Check ไหน fail
+      - ไฟล์/บรรทัดที่เป็นปัญหา
+      - คำสั่งที่ใช้ repro + ผลที่ได้
+      - Concrete fix suggestion (ไม่ใช่ vague "improve a11y")

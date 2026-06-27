@@ -1,24 +1,18 @@
 'use client';
 
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
+import { useHasHydrated } from '@/hooks/useHasHydrated';
 import { DashboardSummary } from '@/components/DashboardSummary';
 import { PocketCard } from '@/components/PocketCard';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { Plus, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useEffect, useState } from 'react';
 
 export default function Home() {
   const { pockets, allocations, settings } = usePocketRouterStore();
-  const [mounted, setMounted] = useState(false);
-  const router = useRouter();
+  const hasHydrated = useHasHydrated();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
+  if (!hasHydrated) {
     return <div className="p-6">Loading...</div>;
   }
 
@@ -75,7 +69,7 @@ export default function Home() {
                   pocket={pocket} 
                   allocations={allocations} 
                   settings={settings}
-                  onClick={() => router.push(`/pockets/${pocket.id}`)}
+                  href={`/pockets/${pocket.id}`}
                 />
               ))}
             </div>
