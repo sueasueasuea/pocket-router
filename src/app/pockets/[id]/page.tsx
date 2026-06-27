@@ -18,7 +18,6 @@ import {
   Plus,
   Landmark,
   Wallet,
-  Trash2,
   Sparkles,
 } from 'lucide-react';
 
@@ -332,19 +331,8 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
                     onDrop={handleDrop}
                     isDragging={draggingBankId === bank.id}
                     isDragOver={dragOverBankId === bank.id}
+                    onRemove={() => handleDeleteBankFromPocket(bank.id)}
                   />
-                  {/* Action buttons on hover */}
-                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 rounded-full bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm shadow-sm hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                      onClick={() => handleDeleteBankFromPocket(bank.id)}
-                      title="Remove from this pocket"
-                    >
-                      <Trash2 className="w-3 h-3 text-rose-500" />
-                    </Button>
-                  </div>
                 </div>
               );
             })}

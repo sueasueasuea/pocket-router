@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
 import { Pocket } from '@/types';
@@ -10,8 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Trash2, Edit2, Wallet, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Edit2, Wallet, GripVertical } from 'lucide-react';
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
+import { DraggableListItem } from '@/components/DraggableListItem';
 
 const PRESET_EMOJIS = [
   '🏠', '💳', '🏥', '🚗', '✈️', '🎓', '🍔', '🛍️',
@@ -22,7 +23,7 @@ const PRESET_EMOJIS = [
 ];
 
 export default function PocketsPage() {
-  const { pockets, allocations, settings, addPocket, updatePocket, deletePocket } = usePocketRouterStore();
+  const { pockets, allocations, settings, addPocket, updatePocket, deletePocket, reorderPockets } = usePocketRouterStore();
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
@@ -40,6 +41,34 @@ export default function PocketsPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Sort by user-defined order, fall back to creation time for legacy items.
+  const sortedPockets = useMemo(
+    () =>
+      [...pockets].sort((a, b) => {
+        const ao = a.order ?? Number.MAX_SAFE_INTEGER;
+        const bo = b.order ?? Number.MAX_SAFE_INTEGER;
+        if (ao !== bo) return ao - bo;
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }),
+    [pockets]
+  );
+
+  const handleReorderPocket = useCallback(
+    async (fromId: string, toIndex: number) => {
+      const ids = sortedPockets.map((p) => p.id);
+      const fromIndex = ids.indexOf(fromId);
+      if (fromIndex === -1) return;
+      const clamped = Math.max(0, Math.min(toIndex, ids.length));
+      if (clamped === fromIndex || clamped === fromIndex + 1) return;
+      const next = [...ids];
+      next.splice(fromIndex, 1);
+      const adjusted = clamped > fromIndex ? clamped - 1 : clamped;
+      next.splice(adjusted, 0, fromId);
+      await reorderPockets(next);
+    },
+    [sortedPockets, reorderPockets]
+  );
 
   if (!mounted) return <div className="p-6">Loading...</div>;
 
@@ -155,59 +184,87 @@ export default function PocketsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {pockets.map((pocket) => {
+            {sortedPockets.map((pocket, index) => {
               const balance = getPocketBalance(pocket.id);
               const hasTarget = pocket.targetAmount !== undefined && pocket.targetAmount > 0;
               const progress = hasTarget ? Math.min(100, Math.round((balance / pocket.targetAmount!) * 100)) : 0;
 
               return (
-                <Card 
+                <DraggableListItem
                   key={pocket.id}
-                  className="border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.98] duration-200"
-                  onClick={() => router.push(`/pockets/${pocket.id}`)}
+                  id={pocket.id}
+                  index={index}
+                  onReorder={handleReorderPocket}
+                  className="rounded-2xl"
                 >
-                  <CardContent className="p-4 flex flex-col gap-3">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shadow-inner">
-                          {pocket.icon}
-                        </span>
-                        <div>
-                          <h3 className="font-bold text-zinc-950 dark:text-zinc-50">{pocket.name}</h3>
-                          <p className="text-xs font-semibold text-zinc-500 mt-0.5">
-                            {formatCurrency(balance)}
-                            {hasTarget && ` / ${formatCurrency(pocket.targetAmount!)}`}
-                          </p>
+                  <Card
+                    className="border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all cursor-pointer active:scale-[0.98] duration-200"
+                    onClick={() => router.push(`/pockets/${pocket.id}`)}
+                  >
+                    <CardContent className="p-4 flex flex-col gap-3">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-2xl w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shadow-inner">
+                            {pocket.icon}
+                          </span>
+                          <div className="min-w-0">
+                            <h3 className="font-bold text-zinc-950 dark:text-zinc-50 truncate">{pocket.name}</h3>
+                            <p className="text-xs font-semibold text-zinc-500 mt-0.5">
+                              {formatCurrency(balance)}
+                              {hasTarget && ` / ${formatCurrency(pocket.targetAmount!)}`}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <Button
+                            aria-label="Edit pocket"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full"
+                            onClick={(e) => { e.stopPropagation(); openEditDialog(pocket); }}
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-zinc-500" />
+                          </Button>
+                          <Button
+                            aria-label="Delete pocket"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                            onClick={(e) => { e.stopPropagation(); handleDeletePocket(pocket.id); }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                          </Button>
+                          {/* Drag handle (visual affordance + drag start on desktop). */}
+                          <span
+                            aria-hidden
+                            className="h-8 w-6 flex items-center justify-center text-zinc-300 dark:text-zinc-600 cursor-grab active:cursor-grabbing touch-none"
+                          >
+                            <GripVertical className="w-4 h-4" />
+                          </span>
                         </div>
                       </div>
 
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={(e) => { e.stopPropagation(); openEditDialog(pocket); }}>
-                          <Edit2 className="w-3.5 h-3.5 text-zinc-500" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-rose-50 dark:hover:bg-rose-950/20" onClick={(e) => { e.stopPropagation(); handleDeletePocket(pocket.id); }}>
-                          <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                        </Button>
-                        <div className="flex items-center text-zinc-300 dark:text-zinc-600">
-                          <ChevronRight className="w-4 h-4" />
+                      {hasTarget && (
+                        <div className="flex flex-col gap-1.5 mt-1">
+                          <div className="flex justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                            <span>Target Progress</span>
+                            <span>{progress}%</span>
+                          </div>
+                          <Progress value={progress} className="h-2 bg-zinc-100 dark:bg-zinc-800" />
                         </div>
-                      </div>
-                    </div>
-
-                    {hasTarget && (
-                      <div className="flex flex-col gap-1.5 mt-1">
-                        <div className="flex justify-between text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                          <span>Target Progress</span>
-                          <span>{progress}%</span>
-                        </div>
-                        <Progress value={progress} className="h-2 bg-zinc-100 dark:bg-zinc-800" />
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                      )}
+                    </CardContent>
+                  </Card>
+                </DraggableListItem>
               );
             })}
           </div>
+        )}
+        {sortedPockets.length > 1 && (
+          <p className="text-[11px] text-center text-zinc-400 mt-1">
+            Tip: long-press or drag a card to reorder
+          </p>
         )}
       </div>
 

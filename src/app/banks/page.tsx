@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
 import { Bank } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,9 @@ import {
   Edit2,
   Trash2,
   TrendingUp,
+  GripVertical,
 } from 'lucide-react';
+import { DraggableListItem } from '@/components/DraggableListItem';
 
 const PRESET_COLORS = [
   { name: 'Emerald', value: '#10b981' },
@@ -46,6 +48,7 @@ export default function ManageBanksPage() {
     addBank,
     updateBank,
     deleteBank,
+    reorderBanks,
   } = usePocketRouterStore();
 
   const [mounted, setMounted] = useState(false);
@@ -87,6 +90,34 @@ export default function ManageBanksPage() {
       allocations.filter((a) => a.bankId === bankId).map((a) => a.pocketId)
     ).size;
   };
+
+  // Sort banks by user-defined order, fall back to creation time.
+  const sortedBanks = useMemo(
+    () =>
+      [...banks].sort((a, b) => {
+        const ao = a.order ?? Number.MAX_SAFE_INTEGER;
+        const bo = b.order ?? Number.MAX_SAFE_INTEGER;
+        if (ao !== bo) return ao - bo;
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }),
+    [banks]
+  );
+
+  const handleReorderBank = useCallback(
+    async (fromId: string, toIndex: number) => {
+      const ids = sortedBanks.map((b) => b.id);
+      const fromIndex = ids.indexOf(fromId);
+      if (fromIndex === -1) return;
+      const clamped = Math.max(0, Math.min(toIndex, ids.length));
+      if (clamped === fromIndex || clamped === fromIndex + 1) return;
+      const next = [...ids];
+      next.splice(fromIndex, 1);
+      const adjusted = clamped > fromIndex ? clamped - 1 : clamped;
+      next.splice(adjusted, 0, fromId);
+      await reorderBanks(next);
+    },
+    [sortedBanks, reorderBanks]
+  );
 
   const resetBankForm = () => {
     setBankName('');
@@ -206,89 +237,131 @@ export default function ManageBanksPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {banks.map((bank) => {
+            {sortedBanks.map((bank, index) => {
               const total = getBankTotal(bank.id);
               const pocketCount = getBankPocketCount(bank.id);
               const estimatedInterest = (total * bank.interestRate) / 100;
 
               return (
-                <Card
+                <DraggableListItem
                   key={bank.id}
-                  className="overflow-hidden border-none shadow-sm hover:shadow-md transition-all duration-200"
-                  style={{ backgroundColor: bank.themeColor }}
+                  id={bank.id}
+                  index={index}
+                  onReorder={handleReorderBank}
+                  className="rounded-2xl"
                 >
-                  <div className="bg-black/10 dark:bg-black/40 backdrop-blur-[2px] w-full h-full">
-                    <CardContent className="p-0 text-white">
-                      <div className="flex items-stretch">
-                        {/* Bank info */}
-                        <div className="flex-1 p-5">
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <h3 className="font-bold text-lg leading-tight tracking-tight drop-shadow-sm">
-                                {bank.name}
-                              </h3>
-                              <div className="flex items-center gap-1.5 mt-1">
-                                <TrendingUp className="w-3 h-3 text-white/70" />
-                                <span className="text-xs font-medium text-white/70">
-                                  {bank.interestRate}% / year
-                                </span>
+                  <Card
+                    className="overflow-hidden border-none shadow-sm hover:shadow-md transition-all duration-200"
+                    style={{ backgroundColor: bank.themeColor }}
+                  >
+                    <div className="bg-black/10 dark:bg-black/40 backdrop-blur-[2px] w-full h-full">
+                      <CardContent className="p-0 text-white">
+                        <div className="flex items-stretch">
+                          {/* Bank info */}
+                          <div className="flex-1 p-5">
+                            <div className="flex items-start justify-between mb-3 gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                {/* Bank icon — logo if available, otherwise Landmark. */}
+                                <div
+                                  aria-hidden
+                                  className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/20 backdrop-blur-sm shadow-sm flex-shrink-0"
+                                >
+                                  {bank.logoUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={bank.logoUrl}
+                                      alt=""
+                                      className="w-6 h-6 rounded-full object-cover bg-white"
+                                      onError={(e) => {
+                                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                      }}
+                                    />
+                                  ) : (
+                                    <Landmark className="w-5 h-5 text-white drop-shadow" />
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <h3 className="font-bold text-lg leading-tight tracking-tight drop-shadow-sm truncate">
+                                    {bank.name}
+                                  </h3>
+                                  <div className="flex items-center gap-1.5 mt-1">
+                                    <TrendingUp className="w-3 h-3 text-white/70" />
+                                    <span className="text-xs font-medium text-white/70">
+                                      {bank.interestRate}% / year
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                          </div>
 
-                          <div className="flex items-end gap-6">
-                            <div>
-                              <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">
-                                Total Balance
-                              </p>
-                              <p className="text-xl font-bold tracking-tight drop-shadow-md">
-                                {formatCurrency(total)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">
-                                Est. Interest
-                              </p>
-                              <p className="text-sm font-semibold text-white/80">
-                                +{formatCurrency(estimatedInterest)}
-                              </p>
-                            </div>
-                            {pocketCount > 0 && (
+                            <div className="flex items-end gap-6 flex-wrap">
                               <div>
                                 <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">
-                                  Pockets
+                                  Total Balance
                                 </p>
-                                <p className="text-sm font-semibold text-white/80">
-                                  {pocketCount}
+                                <p className="text-xl font-bold tracking-tight drop-shadow-md">
+                                  {formatCurrency(total)}
                                 </p>
                               </div>
-                            )}
+                              <div>
+                                <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">
+                                  Est. Interest
+                                </p>
+                                <p className="text-sm font-semibold text-white/80">
+                                  +{formatCurrency(estimatedInterest)}
+                                </p>
+                              </div>
+                              {pocketCount > 0 && (
+                                <div>
+                                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-0.5">
+                                    Pockets
+                                  </p>
+                                  <p className="text-sm font-semibold text-white/80">
+                                    {pocketCount}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Action buttons + drag handle */}
+                          <div className="flex flex-col border-l border-white/10">
+                            <button
+                              aria-label="Edit bank"
+                              className="flex-1 flex items-center justify-center px-3 hover:bg-white/10 transition-colors duration-150"
+                              onClick={() => openEditBankDialog(bank)}
+                            >
+                              <Edit2 className="w-4 h-4 text-white/80" />
+                            </button>
+                            <div className="border-t border-white/10" />
+                            <button
+                              aria-label="Delete bank"
+                              className="flex-1 flex items-center justify-center px-3 hover:bg-rose-500/20 transition-colors duration-150"
+                              onClick={() => handleDeleteBank(bank)}
+                            >
+                              <Trash2 className="w-4 h-4 text-white/80" />
+                            </button>
+                            <div className="border-t border-white/10" />
+                            <span
+                              aria-hidden
+                              className="flex-1 flex items-center justify-center px-3 text-white/70 cursor-grab active:cursor-grabbing touch-none"
+                            >
+                              <GripVertical className="w-4 h-4" />
+                            </span>
                           </div>
                         </div>
-
-                        {/* Action buttons */}
-                        <div className="flex flex-col border-l border-white/10">
-                          <button
-                            className="flex-1 flex items-center justify-center px-4 hover:bg-white/10 transition-colors duration-150"
-                            onClick={() => openEditBankDialog(bank)}
-                          >
-                            <Edit2 className="w-4 h-4 text-white/80" />
-                          </button>
-                          <div className="border-t border-white/10" />
-                          <button
-                            className="flex-1 flex items-center justify-center px-4 hover:bg-rose-500/20 transition-colors duration-150"
-                            onClick={() => handleDeleteBank(bank)}
-                          >
-                            <Trash2 className="w-4 h-4 text-white/80" />
-                          </button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </div>
-                </Card>
+                      </CardContent>
+                    </div>
+                  </Card>
+                </DraggableListItem>
               );
             })}
           </div>
+        )}
+        {sortedBanks.length > 1 && (
+          <p className="text-[11px] text-center text-zinc-400 mt-1">
+            Tip: long-press or drag a card to reorder
+          </p>
         )}
       </div>
 

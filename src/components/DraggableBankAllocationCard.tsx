@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback } from 'react';
 import { Bank, Allocation, AppSettings } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
-import { Landmark, GripVertical } from 'lucide-react';
+import { Landmark, GripVertical, Trash2 } from 'lucide-react';
 
 interface DraggableBankAllocationCardProps {
   bank: Bank;
@@ -14,6 +14,8 @@ interface DraggableBankAllocationCardProps {
   onDrop: (targetBankId: string) => void;
   isDragging: boolean;
   isDragOver: boolean;
+  /** Called when user taps the trash button to remove this allocation. */
+  onRemove?: () => void;
 }
 
 export function DraggableBankAllocationCard({
@@ -25,6 +27,7 @@ export function DraggableBankAllocationCard({
   onDrop,
   isDragging,
   isDragOver,
+  onRemove,
 }: DraggableBankAllocationCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [touchDragging, setTouchDragging] = useState(false);
@@ -176,6 +179,24 @@ export function DraggableBankAllocationCard({
                 </p>
               </div>
             </div>
+
+            {/* Remove button — always visible so it's tappable on mobile. */}
+            {onRemove && (
+              <button
+                type="button"
+                aria-label={`Remove ${bank.name} from this pocket`}
+                title="Remove from this pocket"
+                onClick={(e) => {
+                  // Stop the touch/drag handlers on the parent from swallowing this tap.
+                  e.stopPropagation();
+                  onRemove();
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="flex-shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 active:scale-95 transition-all touch-none"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </CardContent>
 

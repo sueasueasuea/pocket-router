@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { BottomNav } from "@/components/BottomNav";
+import { ErrorModal } from "@/components/ErrorModal";
+import { ClientProviders } from "@/components/ClientProviders";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,8 +20,6 @@ export const viewport: Viewport = {
   themeColor: "#f4f4f5", // zinc-100
 };
 
-import { ClientProviders } from "@/components/ClientProviders";
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -34,6 +34,8 @@ export default function RootLayout({
             {children}
           </div>
           <BottomNav />
+          {/* Global error toast/modal — reacts to lastError in the store. */}
+          <ErrorModal />
         </ClientProviders>
       </body>
     </html>

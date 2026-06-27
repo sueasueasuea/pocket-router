@@ -6,6 +6,7 @@ export interface Bank {
   logoUrl?: string; // URL to logo or image
   themeColor: string; // Hex color code for UI
   createdAt: string;
+  order?: number; // User-defined display order (lower = first)
 }
 
 export interface Pocket {
@@ -15,6 +16,7 @@ export interface Pocket {
   targetAmount?: number; // Optional: Pockets can exist without a target amount
   icon: string; // Emoji or icon name string
   createdAt: string;
+  order?: number; // User-defined display order (lower = first)
 }
 
 export interface Allocation {

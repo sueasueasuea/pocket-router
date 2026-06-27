@@ -34,5 +34,19 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
     }
   }, [user, isInitialized]);
 
+  // Realtime: subscribe when signed in + cloud mode, unsubscribe otherwise.
+  useEffect(() => {
+    if (!isInitialized) return;
+    const storageType = usePocketRouterStore.getState().settings.storageType;
+    if (user && storageType === 'supabase') {
+      usePocketRouterStore.getState().subscribeRealtime();
+    } else {
+      usePocketRouterStore.getState().unsubscribeRealtime();
+    }
+    return () => {
+      usePocketRouterStore.getState().unsubscribeRealtime();
+    };
+  }, [user, isInitialized]);
+
   return <>{children}</>;
 }
