@@ -138,7 +138,11 @@ export default function InviteLandingPage({
     return () => {
       cancelled = true;
     };
-  }, [token, tokenIsValid]);
+    // We depend on `user?.id` so the effect re-runs (and re-resolves
+    // the owner's display name from `profiles`) when an anonymous
+    // visitor finishes signing in. Without this, the landing page
+    // would keep showing the "Someone" fallback forever after login.
+  }, [token, tokenIsValid, user?.id]);
 
   const handleAccept = async () => {
     if (state.kind !== 'ready') return;

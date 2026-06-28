@@ -5,6 +5,26 @@
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
+-- 0) Table-level privileges for the `authenticated` role.
+--
+-- Supabase's PostgREST gateway only serves a query if the caller has
+-- the underlying table privilege; RLS policies gate WHICH rows are
+-- visible but don't grant the privilege itself. Without these GRANTs
+-- every query returns "permission denied for table X" (SQLSTATE 42501)
+-- even when RLS would otherwise allow it.
+-- ---------------------------------------------------------------------
+grant usage on schema public to authenticated, anon;
+
+grant select, insert, update on public.profiles     to authenticated;
+-- Anonymous users must be able to read an invite by token (the whole
+-- point of a public invite link is that anyone with the URL can hit
+-- /invite/[token] before signing up). They're blocked from reading
+-- anything else by RLS.
+grant select                          on public.invites      to authenticated, anon;
+grant insert, update                  on public.invites      to authenticated;
+grant select, insert, update, delete on public.share_access to authenticated;
+
+-- ---------------------------------------------------------------------
 -- 1) profiles — minimal display-name directory so the invite landing
 -- page can say "X invited you to view their wallet" without leaking
 -- emails.
@@ -108,10 +128,14 @@ create policy "invites_owner_all"
   using (owner_id = auth.uid())
   with check (owner_id = auth.uid());
 
+-- Public SELECT on invites by token — covers BOTH anonymous users
+-- (so the /invite/[token] landing page works before the friend has
+-- signed up) and authenticated users (so the landing page can resolve
+-- owner info without a separate query path).
 drop policy if exists "invites_select_by_token" on public.invites;
 create policy "invites_select_by_token"
   on public.invites for select
-  to authenticated
+  to authenticated, anon
   using (revoked = false);
 
 -- share_access:

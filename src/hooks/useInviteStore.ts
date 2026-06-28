@@ -69,27 +69,34 @@ interface InviteState {
 
 // ---- Helpers -----------------------------------------------------------
 
-interface JoinedShareRow {
-  invite: DbInvite;
-  share_access: DbShareAccess | DbShareAccess[] | null;
-}
-
-function pickFirst<T>(v: T | T[] | null): T | null {
-  if (v == null) return null;
-  return Array.isArray(v) ? (v[0] ?? null) : v;
-}
-
 /**
  * Supabase foreign-key joins can return the related row either as a
  * single object (single-row join) or as an array (one-to-many). This
  * helper normalizes both into a single object-or-null.
+ *
+ * Note: when you write `select('*, share_access (*)')`, the OUTER
+ * table fields are spread at the top level of each row — NOT wrapped
+ * under an `invite` key. The wrapper only appears with explicit
+ * aliases (`invite:invites(*)`), which we don't use here.
  */
-function normalizeJoined(row: JoinedShareRow): {
-  invite: Invite;
-  shareAccess: ShareAccess | null;
-} {
-  const sa = pickFirst(row.share_access);
-  return { invite: mapInvite(row.invite), shareAccess: sa ? mapShareAccess(sa) : null };
+function normalizeJoinedShare(
+  raw: DbShareAccess | DbShareAccess[] | null | undefined,
+): ShareAccess | null {
+  if (raw == null) return null;
+  const row = Array.isArray(raw) ? raw[0] : raw;
+  return row ? mapShareAccess(row) : null;
+}
+
+interface InviteWithJoin {
+  // outer table fields (snake_case from Supabase)
+  id: string;
+  owner_id: string;
+  token: string;
+  permission: InvitePermission;
+  created_at: string;
+  revoked: boolean;
+  // joined
+  share_access: DbShareAccess | DbShareAccess[] | null;
 }
 
 // ---- Store -------------------------------------------------------------
@@ -126,11 +133,12 @@ export const useInviteStore = create<InviteState>()((set, get) => ({
       const acceptedByIds = Array.from(
         new Set(
           (data ?? [])
-            .flatMap((row) =>
-              pickFirst((row as unknown as JoinedShareRow).share_access)
-                ? [pickFirst((row as unknown as JoinedShareRow).share_access)!.accepted_by]
-                : [],
-            ),
+            .flatMap((row) => {
+              const sa = normalizeJoinedShare(
+                (row as unknown as InviteWithJoin).share_access,
+              );
+              return sa ? [sa.acceptedBy] : [];
+            }),
         ),
       );
 
@@ -147,12 +155,20 @@ export const useInviteStore = create<InviteState>()((set, get) => ({
       }
 
       const entries: ShareEntry[] = (data ?? []).map((row) => {
-        const normalized = normalizeJoined(row as unknown as JoinedShareRow);
-        const sa = normalized.shareAccess;
-        if (sa && profilesById.has(sa.acceptedBy)) {
-          sa.acceptedByName = profilesById.get(sa.acceptedBy)!.display_name;
+        const inviteRow = row as unknown as InviteWithJoin;
+        const invite = mapInvite({
+          id: inviteRow.id,
+          owner_id: inviteRow.owner_id,
+          token: inviteRow.token,
+          permission: inviteRow.permission,
+          created_at: inviteRow.created_at,
+          revoked: inviteRow.revoked,
+        });
+        const shareAccess = normalizeJoinedShare(inviteRow.share_access);
+        if (shareAccess && profilesById.has(shareAccess.acceptedBy)) {
+          shareAccess.acceptedByName = profilesById.get(shareAccess.acceptedBy)!.display_name;
         }
-        return { invite: normalized.invite, shareAccess: sa };
+        return { invite, shareAccess };
       });
 
       set({ entries, isLoading: false });
