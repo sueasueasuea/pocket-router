@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 import { supabase } from '@/utils/supabase/client';
 
 function safeNextPath(raw: string | null): string {
@@ -22,26 +23,54 @@ function AuthCallbackInner() {
   const nextPath = safeNextPath(searchParams.get('next'));
 
   useEffect(() => {
+    let cancelled = false;
     // Supabase will automatically parse the hash segment in the URL
     // (e.g. #access_token=...) and establish the session client-side.
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        router.push(nextPath);
-      } else {
-        // Wait a brief moment for the Supabase client to process the hash fragment if needed
-        setTimeout(async () => {
-          const { data: { session: retriedSession } } = await supabase.auth.getSession();
-          if (retriedSession) {
-            router.push(nextPath);
-          } else {
-            router.push('/login');
-          }
-        }, 1500);
+      // First attempt — Supabase usually parses the hash synchronously.
+      let session = (await supabase.auth.getSession()).data.session;
+      // Brief retry window for slow environments where the hash
+      // listener fires after this effect's first `getSession` call.
+      if (!session) {
+        await new Promise((r) => setTimeout(r, 1500));
+        if (cancelled) return;
+        session = (await supabase.auth.getSession()).data.session;
       }
+      if (cancelled) return;
+
+      if (!session) {
+        router.push('/login');
+        return;
+      }
+
+      // Enforce display_name for OAuth users — they never see the
+      // signup form, so the only place we can ask is here. If the
+      // trigger fallback populated an empty / email-local-part name,
+      // push them through the onboarding flow before the intended
+      // destination.
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      const name = profile?.display_name?.trim() ?? '';
+      if (name.length < 2) {
+        router.push(
+          `/onboarding/display-name?next=${encodeURIComponent(nextPath)}`,
+        );
+        return;
+      }
+
+      router.push(nextPath);
     };
-    
+
     checkSession();
+    return () => {
+      cancelled = true;
+    };
   }, [router, nextPath]);
 
   return (
@@ -49,7 +78,7 @@ function AuthCallbackInner() {
       <div className="text-center">
         <h2 className="text-xl font-semibold mb-2 text-zinc-800 dark:text-zinc-200">Logging you in...</h2>
         <p className="text-sm text-zinc-500 mb-4">Please wait while we complete the authentication.</p>
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+        <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto" />
       </div>
     </div>
   );
@@ -59,7 +88,7 @@ export default function AuthCallback() {
   return (
     <Suspense fallback={
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4">
-        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
     }>
       <AuthCallbackInner />

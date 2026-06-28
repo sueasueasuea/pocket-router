@@ -1,0 +1,131 @@
+﻿version: 1
+plan:
+  name: 'บังคับ display_name ตอน signup + เพิ่มตัวแก้ใน settings'
+  max_concurrency: 2
+  max_consecutive_failures: 2
+  max_cycles: 6
+  auto_reject_retries: 1
+  verifier_config:
+    default_verifiers: [verifier]
+    audit_sample_rate: 0.0
+tasks:
+  - id: display-name-producer
+    title: 'บังคับ display_name ตอน signup และเพิ่มหน้าแก้ใน settings'
+    prompt: |
+      Workspace: D:\dev\money-tagging (Next.js 16 + Supabase + Zustand + Tailwind + shadcn/ui)
+
+      ## เป้าหมาย
+      1. บังคับให้ผู้ใช้ใส่ display_name ตอน signup (email/password + Google OAuth)
+      2. เพิ่ม UI ในการแก้ display_name ภายหลัง (ทั้งในหน้า profile เดิมและหน้า settings)
+
+      ## บริบทสำคัญ
+      - DB มีตาราง `profiles(id, display_name)` อยู่แล้ว — trigger `on_auth_user_created` ใน
+        `supabase/migrations/20260628_add_invites_and_sharing.sql` อ่าน
+        `raw_user_meta_data->>'display_name'` แล้วใส่ลง profiles. ถ้าไม่มี จะ fallback
+        เป็น local-part ของอีเมล → เลยทำให้เห็น "Someone" ตอนคนอื่นมาดู wallet เรา
+      - Login page ตอนนี้รวม signin/signup ไว้ด้วยกัน (มี `isLogin` toggle) ที่
+        `src/app/login/page.tsx`
+      - ตอน user login แล้ว หน้า login เปลี่ยนเป็น "Profile" panel มี CurrencyEditor อยู่
+      - `/auth/callback/page.tsx` จัดการ OAuth flow แล้ว redirect ไป `next`
+      - `useAuthStore` ตอนนี้ track แค่ `user` (Supabase User) — ยังไม่มี profile
+
+      ## งานที่ต้องทำ
+
+      ### 1. บังคับ display_name ตอน email signup
+      แก้ `src/app/login/page.tsx`:
+      - เพิ่ม state `displayName` (string)
+      - เมื่อ `!isLogin` แสดง Input "Display name" ใต้ช่อง password, required
+      - validate: trim แล้วต้องยาว >= 2 ตัวอักษร, ห้ามว่าง
+      - ตอนเรียก `supabase.auth.signUp` ส่ง
+        `options: { data: { display_name: displayName.trim() } }`
+        เพื่อให้ trigger ใส่ลง profiles
+      - ตอน user login กลับเข้ามาครั้งแรก ถ้า profile.display_name ยังว่าง (เช่น user เก่า
+        ก่อน feature นี้) ให้บังคับตั้งในขั้นตอนถัดไป
+
+      ### 2. Google OAuth flow ที่ไม่มี display_name
+      ใน `/auth/callback/page.tsx` (หรือตำแหน่งที่เหมาะสม):
+      - หลัง session พร้อม ให้ query `profiles.display_name` ของ user.id
+      - ถ้าว่าง/blank → redirect ไป `/onboarding/display-name?next=<originalNext>`
+      - ถ้ามีแล้ว → redirect ตามปกติ
+
+      ### 3. หน้า /onboarding/display-name
+      สร้าง `src/app/onboarding/display-name/page.tsx`:
+      - ถ้าไม่ได้ login → redirect /login
+      - มี Input + Save button
+      - Save → upsert ลง `profiles` table (`display_name`), แล้ว redirect ไป `next` หรือ `/`
+      - กันกดข้ามไม่ได้ จนกว่าจะ save สำเร็จ (ไม่มีปุ่ม "skip")
+
+      ### 4. เพิ่ม display_name editor ใน profile panel
+      ในหน้า `/login` ตอน logged-in (Profile panel):
+      - เพิ่ม `DisplayNameEditor` component ข้างบน CurrencyEditor
+      - มี Input + Save button (Save disabled ถ้าค่าเท่าของเดิม)
+      - Save → update `profiles.display_name` แล้ว update store
+      - ใช้ pattern เดียวกับ CurrencyEditor (key on hydration)
+
+      ### 5. เพิ่มหน้า /settings/profile
+      สร้าง `src/app/settings/profile/page.tsx` (ตาม style ของ /settings/sharing/page.tsx):
+      - ถ้าไม่ได้ login → redirect /login
+      - มี section "Display name" กับ Input + Save
+      - มี section "Default currency" (ใช้ CurrencyEditor pattern เดิมได้)
+      - เพิ่ม link จาก /login (Profile panel) ไป /settings/profile ด้วย
+        ปุ่ม "Open settings"
+
+      ### 6. ขยาย useAuthStore
+      แก้ `src/hooks/useAuthStore.ts`:
+      - เพิ่ม `profile: { display_name: string } | null` ใน AuthState
+      - เพิ่ม `refreshProfile()` ที่ query `profiles` table ตาม user.id
+      - เพิ่ม `updateDisplayName(name: string)` ที่ upsert profiles แล้ว update store
+      - เรียก `refreshProfile()` ใน initialize() และ onAuthStateChange (เมื่อ user เปลี่ยน)
+      - clear profile ตอน signOut
+
+      ### 7. RLS / migration
+      - ตรวจ `supabase/migrations/` ว่า profiles table มี RLS policy ให้ user
+        update `display_name` ของตัวเองได้ไหม ถ้ายังไม่มี ให้เพิ่ม migration ใหม่
+        (เช่น `20260629_add_profile_display_name_rls.sql`) — เปิดให้ user upsert
+        row ของตัวเองได้ (id = auth.uid()) แต่ห้ามแก้ row คนอื่น
+
+      ## ข้อกำหนด
+      - ทุกไฟล์ต้อง typecheck ผ่าน (รัน `npx tsc --noEmit` หรือเทียบเท่า)
+      - ใช้ pattern เดิมของ codebase (Zustand store, shadcn components, "use client")
+      - ใส่ JSDoc/comment สั้น ๆ ตรงจุดสำคัญ เหมือนไฟล์อื่น ๆ
+      - ห้ามใช้ `// TODO` ค้าง — ทำให้ครบ
+      - อย่าแก้ไฟล์ที่ไม่เกี่ยวข้อง (focus scope เท่านี้)
+
+      ## Output ที่ต้องรายงงานกลับ
+      - รายชื่อไฟล์ที่แก้/สร้าง (path)
+      - ผล typecheck
+      - flow สั้น ๆ ของ edge cases: user ใหม่ email, user ใหม่ Google, user เก่าที่ยังไม่มี display_name
+    assigned_to: coder
+    verified_by: verifier
+    verify_prompt: |
+      Independent verification of the display_name changes in D:\dev\money-tagging.
+
+      ## ตรวจให้ครบ
+      1. รัน `npx tsc --noEmit` (หรือ `pnpm typecheck`) — ต้องผ่าน ไม่มี error
+      2. เปิด `src/app/login/page.tsx`:
+         - ตอน signup (`!isLogin`) มีช่อง Display name, required, validate
+         - `signUp` ถูกเรียกพร้อม `options.data.display_name`
+      3. เปิด `src/app/auth/callback/page.tsx`:
+         - มีการ query profiles.display_name หลัง session พร้อม
+         - ถ้าว่าง redirect ไป /onboarding/display-name พร้อม next param
+      4. เปิด `src/app/onboarding/display-name/page.tsx`:
+         - มีไฟล์อยู่จริง, มี Input + Save, ไม่มีปุ่ม skip
+         - Save → upsert profiles แล้ว redirect
+      5. เปิด `src/hooks/useAuthStore.ts`:
+         - มี `profile` state + `refreshProfile` + `updateDisplayName`
+         - initialize/onAuthStateChange เรียก refreshProfile
+         - signOut clear profile
+      6. เปิด `src/app/settings/profile/page.tsx`:
+         - มีไฟล์อยู่จริง, มี Display name editor, login guard
+      7. ตรวจ RLS: ดู migration ใหม่ (ถ้ามี) ว่ามี policy ให้ user upsert row ตัวเองได้
+      8. Spot-check: หา `<form>` ใน login page ว่ามี validation message ที่เหมาะสม
+         (trim, length >= 2)
+      9. ไม่มี `// TODO` ค้างในไฟล์ที่แก้
+
+      ## PASS/FAIL
+      - PASS ถ้าทุกข้อผ่าน และ typecheck สะอาด
+      - FAIL ถ้ามีข้อใดข้อหนึ่งไม่ผ่าน — ระบุไฟล์/บรรทัดที่เจอปัญหา
+
+      ห้ามดูแค่ summary ของ producer — ต้องเปิดไฟล์เอง
+    max_retries: 2
+    timeout_ms: 1800000

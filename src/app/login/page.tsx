@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Wallet, Globe, Share2 } from 'lucide-react';
+import { Wallet, Globe, Share2, Settings as SettingsIcon, User as UserIcon } from 'lucide-react';
 
 /**
  * Only allow same-origin relative paths as `next` redirects — defends
@@ -32,20 +32,46 @@ function LoginPageInner() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  // Signup-only field — surfaced below the password input. Trimmed
+  // value is forwarded as `options.data.display_name` so the
+  // `on_auth_user_created` trigger writes it into `profiles`.
+  const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     setError(null);
-    
+
+    if (!isLogin) {
+      // Inline validation for the signup-only display name. Mirrors
+      // the rule used in /onboarding/display-name so users can't
+      // sneak an empty/short name past the trigger fallback.
+      const trimmedName = displayName.trim();
+      if (trimmedName.length < 2) {
+        setError('Please enter a display name (at least 2 characters).');
+        return;
+      }
+    }
+
+    setIsLoading(true);
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            // Pass the display name through user metadata so the
+            // `handle_new_user` trigger on auth.users inserts it
+            // into `profiles.display_name`. Without this the
+            // trigger falls back to the email's local-part, which
+            // shows up as a half-broken name on shared invites.
+            data: { display_name: displayName.trim() },
+          },
+        });
         if (error) throw error;
         alert('Check your email for the confirmation link.');
       }
@@ -74,6 +100,7 @@ function LoginPageInner() {
   };
 
   const user = useAuthStore((state) => state.user);
+  const profile = useAuthStore((state) => state.profile);
   const signOut = useAuthStore((state) => state.signOut);
 
   // `hasHydrated` gates the profile / currency editor so it doesn't flash the
@@ -95,6 +122,23 @@ function LoginPageInner() {
               <p className="font-medium">{user.email}</p>
             </div>
 
+            {/* Display name editor — keyed on user.id so a fresh mount
+                seeds `useState` from the freshly-loaded profile, but a
+                subsequent profile update (after Save) doesn't clobber
+                the user's in-progress edit. The skeleton covers the
+                brief window where `profile` is still null after login. */}
+            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
+              <div className="flex items-center gap-2 mb-3">
+                <UserIcon className="w-4 h-4 text-zinc-500" />
+                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Display name</span>
+              </div>
+              {profile ? (
+                <DisplayNameEditor key={user.id} initialName={profile.display_name} />
+              ) : (
+                <DisplayNameEditorSkeleton />
+              )}
+            </div>
+
             {/* Currency Settings — keyed on hydration so the draft is
                 initialized from the persisted value rather than the default. */}
             <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
@@ -110,7 +154,13 @@ function LoginPageInner() {
             </div>
 
             {/* Sharing entry — gate-kept to logged-in state. */}
-            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
+            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 space-y-2">
+              <Link href="/settings/profile">
+                <Button variant="outline" className="w-full justify-start">
+                  <SettingsIcon className="w-4 h-4 mr-2" />
+                  Open settings
+                </Button>
+              </Link>
               <Link href="/settings/sharing">
                 <Button variant="outline" className="w-full justify-start">
                   <Share2 className="w-4 h-4 mr-2" />
@@ -119,9 +169,9 @@ function LoginPageInner() {
               </Link>
             </div>
 
-            <Button 
-              variant="destructive" 
-              className="w-full" 
+            <Button
+              variant="destructive"
+              className="w-full"
               onClick={async () => {
                 await signOut();
                 router.push('/');
@@ -166,24 +216,48 @@ function LoginPageInner() {
                 {error}
               </div>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="you@example.com" 
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
               />
             </div>
-            
+
+            {/* Display name field — signup only. The HTML5
+                `required` + `minLength={2}` mirror the inline JS
+                validation above so the browser surfaces the same
+                error natively on submit. */}
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="display-name">Display name</Label>
+                <Input
+                  id="display-name"
+                  type="text"
+                  placeholder="How friends should see you"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  required
+                  minLength={2}
+                  maxLength={64}
+                  autoComplete="name"
+                />
+                <p className="text-xs text-zinc-500">
+                  Shown when you invite friends to view your wallet.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input 
-                id="password" 
-                type="password" 
+              <Input
+                id="password"
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -204,10 +278,10 @@ function LoginPageInner() {
             </div>
           </div>
 
-          <Button 
-            variant="outline" 
-            type="button" 
-            className="w-full" 
+          <Button
+            variant="outline"
+            type="button"
+            className="w-full"
             onClick={handleGoogleLogin}
           >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -235,16 +309,19 @@ function LoginPageInner() {
         <CardFooter className="flex justify-center border-t p-4">
           <p className="text-sm text-zinc-500">
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button 
+            <button
               className="text-primary hover:underline font-medium"
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setError(null);
+              }}
             >
               {isLogin ? 'Sign up' : 'Sign in'}
             </button>
           </p>
         </CardFooter>
       </Card>
-      
+
       <div className="mt-8">
         <Button variant="link" className="text-zinc-500 text-sm" onClick={() => router.push('/')}>
           Continue as guest (Offline mode)
@@ -295,6 +372,93 @@ function CurrencyEditor() {
 }
 
 function CurrencyEditorSkeleton() {
+  return (
+    <div className="space-y-2" aria-hidden>
+      <div className="h-4 w-24 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+      <div className="flex gap-2">
+        <div className="h-9 flex-1 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
+        <div className="h-9 w-16 bg-zinc-200 dark:bg-zinc-800 rounded-full animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Inline display-name editor — mirrors the pattern used by
+ * `CurrencyEditor`: a local draft held in `useState` that initializes
+ * from `initialName` (which the parent passes once the profile is
+ * loaded), plus a Save button that commits via the store and rolls
+ * back on failure. Save is disabled while the draft matches the saved
+ * value (so we don't issue redundant upserts) or while a save is
+ * already in flight.
+ */
+function DisplayNameEditor({ initialName }: { initialName: string }) {
+  const updateDisplayName = useAuthStore((state) => state.updateDisplayName);
+  // Seed from the prop so the first paint shows the right value
+  // without a setState-in-effect dance. The parent remounts this
+  // component (via `key={user.id}`) when the user changes, so a
+  // freshly-logged-in account always starts with the right draft.
+  const [draft, setDraft] = useState(initialName);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const trimmed = draft.trim();
+  const unchanged = trimmed === initialName.trim();
+  const tooShort = trimmed.length < 2;
+
+  const handleSave = async () => {
+    if (saving || unchanged || tooShort) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await updateDisplayName(trimmed);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save display name');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="profile-display-name">Display name</Label>
+      <div className="flex gap-2">
+        <Input
+          id="profile-display-name"
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              void handleSave();
+            }
+          }}
+          maxLength={64}
+          placeholder="How friends should see you"
+        />
+        <Button
+          size="sm"
+          className="rounded-full"
+          onClick={handleSave}
+          disabled={saving || unchanged || tooShort}
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+      {tooShort && draft.length > 0 && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          Display name must be at least 2 characters.
+        </p>
+      )}
+      {error && (
+        <p className="text-xs text-rose-600 dark:text-rose-400">{error}</p>
+      )}
+    </div>
+  );
+}
+
+function DisplayNameEditorSkeleton() {
   return (
     <div className="space-y-2" aria-hidden>
       <div className="h-4 w-24 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />

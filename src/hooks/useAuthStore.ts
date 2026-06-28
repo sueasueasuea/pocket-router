@@ -3,23 +3,46 @@ import { supabase } from '@/utils/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { usePocketRouterStore } from './usePocketRouterStore';
 
-interface AuthState {
-  user: User | null;
-  isLoading: boolean;
-  isInitialized: boolean;
-  
-  initialize: () => () => void;
-  signOut: () => Promise<void>;
+/**
+ * Minimal profile shape we need in this store. `profiles` also has
+ * `created_at` but no other UI here cares about it, so we keep the
+ * surface narrow.
+ */
+export interface Profile {
+  display_name: string;
 }
 
-export const useAuthStore = create<AuthState>()((set) => ({
+interface AuthState {
+  user: User | null;
+  profile: Profile | null;
+  isLoading: boolean;
+  isInitialized: boolean;
+
+  initialize: () => () => void;
+  signOut: () => Promise<void>;
+  /**
+   * Re-fetch the current user's `profiles` row. Safe to call when
+   * `user` is null (returns null). Used after sign-in, on auth state
+   * changes, and from the display-name editor after a save.
+   */
+  refreshProfile: () => Promise<Profile | null>;
+  /**
+   * Upsert `profiles.display_name` for the current user and mirror the
+   * new value in the store. Throws on RLS / network error so the
+   * editor can surface a message and roll back its draft.
+   */
+  updateDisplayName: (name: string) => Promise<void>;
+}
+
+export const useAuthStore = create<AuthState>()((set, get) => ({
   user: null,
+  profile: null,
   isLoading: true,
   isInitialized: false,
-  
+
   initialize: () => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       set({
         user: session?.user ?? null,
         isLoading: false,
@@ -36,6 +59,12 @@ export const useAuthStore = create<AuthState>()((set) => ({
         void import('./useInviteStore').then(({ clearInviteState }) =>
           clearInviteState(),
         );
+      } else {
+        // Pull the matching `profiles` row so the rest of the UI
+        // (Profile panel, invite landing, settings) can show the
+        // user's display name immediately after refresh instead of
+        // waiting for an explicit `refreshProfile()` call.
+        await get().refreshProfile();
       }
     });
 
@@ -52,9 +81,15 @@ export const useAuthStore = create<AuthState>()((set) => ({
       // double-call during manual signOut (once here, once in signOut()) is
       // harmless.
       if (!nextUser) {
+        set({ profile: null });
         usePocketRouterStore.getState().clearLocalData();
         const { clearInviteState } = await import('./useInviteStore');
         clearInviteState();
+      } else {
+        // New session — pull the matching profile. We deliberately
+        // await this so callers (e.g. /auth/callback) can read the
+        // freshly-fetched state on the next tick.
+        await get().refreshProfile();
       }
     });
 
@@ -62,7 +97,47 @@ export const useAuthStore = create<AuthState>()((set) => ({
       subscription.unsubscribe();
     };
   },
-  
+
+  refreshProfile: async () => {
+    const user = get().user;
+    if (!user) {
+      set({ profile: null });
+      return null;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      const profile: Profile | null = data
+        ? { display_name: data.display_name ?? '' }
+        : null;
+      set({ profile });
+      return profile;
+    } catch (err) {
+      // Don't poison the store with a stale profile on transient
+      // errors — surface the failure via console and let the caller
+      // decide whether to retry.
+      console.error('Failed to load profile:', err);
+      return null;
+    }
+  },
+
+  updateDisplayName: async (name: string) => {
+    const user = get().user;
+    if (!user) throw new Error('Not signed in');
+    const trimmed = name.trim();
+    // Upsert so legacy users whose profile row never got a
+    // display_name (or only an empty one) still land with a value.
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({ id: user.id, display_name: trimmed }, { onConflict: 'id' });
+    if (error) throw error;
+    set({ profile: { display_name: trimmed } });
+  },
+
   signOut: async () => {
     set({ isLoading: true });
     await supabase.auth.signOut();
@@ -79,6 +154,6 @@ export const useAuthStore = create<AuthState>()((set) => ({
     // dependency graph safe.
     const { clearInviteState } = await import('./useInviteStore');
     clearInviteState();
-    set({ user: null, isLoading: false });
-  }
+    set({ user: null, profile: null, isLoading: false });
+  },
 }));
