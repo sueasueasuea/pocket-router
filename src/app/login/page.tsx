@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/hooks/useAuthStore';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
 import { useHasHydrated } from '@/hooks/useHasHydrated';
@@ -11,10 +12,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Wallet, Globe } from 'lucide-react';
+import { Wallet, Globe, Share2 } from 'lucide-react';
 
-export default function LoginPage() {
+/**
+ * Only allow same-origin relative paths as `next` redirects — defends
+ * against open-redirect attacks if someone crafts a `/login?next=…`
+ * link to an external host.
+ */
+function safeNextPath(raw: string | null): string {
+  if (!raw) return '/';
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/';
+  return raw;
+}
+
+function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = safeNextPath(searchParams.get('next'));
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +49,7 @@ export default function LoginPage() {
         if (error) throw error;
         alert('Check your email for the confirmation link.');
       }
-      router.push('/');
+      router.push(nextPath);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred during authentication');
     } finally {
@@ -48,7 +62,9 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          // Include the `next` path so we can bounce to it after
+          // the auth callback finishes.
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
         },
       });
       if (error) throw error;
@@ -91,6 +107,16 @@ export default function LoginPage() {
               ) : (
                 <CurrencyEditorSkeleton />
               )}
+            </div>
+
+            {/* Sharing entry — gate-kept to logged-in state. */}
+            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
+              <Link href="/settings/sharing">
+                <Button variant="outline" className="w-full justify-start">
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Sharing settings
+                </Button>
+              </Link>
             </div>
 
             <Button 
@@ -277,5 +303,20 @@ function CurrencyEditorSkeleton() {
         <div className="h-9 w-16 bg-zinc-200 dark:bg-zinc-800 rounded-full animate-pulse" />
       </div>
     </div>
+  );
+}
+
+// Suspense wrapper — Next 16 requires any client component that calls
+// `useSearchParams()` to live inside a Suspense boundary or the
+// static-export step bails. We render a tiny skeleton as the fallback.
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <LoginPageInner />
+    </Suspense>
   );
 }

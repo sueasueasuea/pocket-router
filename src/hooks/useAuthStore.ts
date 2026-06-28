@@ -32,13 +32,17 @@ export const useAuthStore = create<AuthState>()((set) => ({
       // ever persisted.
       if (!session) {
         usePocketRouterStore.getState().clearLocalData();
+        // Lazy import — avoid circular module dependency with useInviteStore.
+        void import('./useInviteStore').then(({ clearInviteState }) =>
+          clearInviteState(),
+        );
       }
     });
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const nextUser = session?.user ?? null;
       set({ user: nextUser });
       // Session went away — covers manual signOut, refresh-token expiry,
@@ -49,6 +53,8 @@ export const useAuthStore = create<AuthState>()((set) => ({
       // harmless.
       if (!nextUser) {
         usePocketRouterStore.getState().clearLocalData();
+        const { clearInviteState } = await import('./useInviteStore');
+        clearInviteState();
       }
     });
 
@@ -68,6 +74,11 @@ export const useAuthStore = create<AuthState>()((set) => ({
     // Referencing the binding lazily here (inside signOut) keeps the cycle safe
     // because both modules are fully evaluated by the time signOut runs.
     usePocketRouterStore.getState().clearLocalData();
+    // Also clear invite state — same circular-import reasoning applies
+    // (useInviteStore could import from us). Lazy import keeps the
+    // dependency graph safe.
+    const { clearInviteState } = await import('./useInviteStore');
+    clearInviteState();
     set({ user: null, isLoading: false });
   }
 }));

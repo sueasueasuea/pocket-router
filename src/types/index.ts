@@ -45,3 +45,7 @@ export interface BankSummary extends Bank {
   allocations: (Allocation & { pocket: Pocket })[];
   estimatedAnnualInterest: number;
 }
+
+// Re-export invite / sharing domain so consumers can keep using
+// `@/types` as a single barrel.
+export * from './invite';
