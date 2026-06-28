@@ -20,18 +20,36 @@ export const useAuthStore = create<AuthState>()((set) => ({
   initialize: () => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      set({ 
-        user: session?.user ?? null, 
+      set({
+        user: session?.user ?? null,
         isLoading: false,
-        isInitialized: true 
+        isInitialized: true,
       });
+      // Cold start with no session (cookie expired, server-side sign-out, or
+      // a brand-new visitor). Wipe any stale persisted domain data left over
+      // from a previous user on this device so they don't see ghost state on
+      // first render. clearLocalData is idempotent — safe even if nothing was
+      // ever persisted.
+      if (!session) {
+        usePocketRouterStore.getState().clearLocalData();
+      }
     });
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      set({ user: session?.user ?? null });
+      const nextUser = session?.user ?? null;
+      set({ user: nextUser });
+      // Session went away — covers manual signOut, refresh-token expiry,
+      // server-side revocation, etc. Without this, an expired token leaves
+      // the previous user's banks/pockets/allocations sitting in localStorage
+      // until the next explicit logout. clearLocalData is idempotent so the
+      // double-call during manual signOut (once here, once in signOut()) is
+      // harmless.
+      if (!nextUser) {
+        usePocketRouterStore.getState().clearLocalData();
+      }
     });
 
     return () => {
