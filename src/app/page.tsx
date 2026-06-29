@@ -5,7 +5,7 @@ import { useHasHydrated } from '@/hooks/useHasHydrated';
 import { DashboardSummary } from '@/components/DashboardSummary';
 import { PocketCard } from '@/components/PocketCard';
 import Link from 'next/link';
-import { Plus, ArrowRight } from 'lucide-react';
+import { Plus, ArrowRight, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMemo } from 'react';
 import { sortByOrderAndDate } from '@/lib/utils';
@@ -23,13 +23,24 @@ export default function Home() {
     <main className="flex flex-col min-h-full bg-zinc-50 dark:bg-zinc-950 pb-8">
       {/* Header */}
       <header className="bg-white dark:bg-zinc-900 sticky top-0 z-10 border-b border-zinc-100 dark:border-zinc-800 w-full">
-        <div className="max-w-4xl mx-auto w-full px-6 pt-12 pb-4">
-          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-            Pocket Router
-          </h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">
-            Track your money everywhere.
-          </p>
+        <div className="max-w-4xl mx-auto w-full px-6 pt-12 pb-4 flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
+              Pocket Router
+            </h1>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">
+              Track your money everywhere.
+            </p>
+          </div>
+          <Link href="/settings/sharing">
+            <Button
+              size="icon"
+              className="rounded-full cursor-pointer"
+              aria-label="Sharing settings"
+            >
+              <Share2 className="w-4 h-4" />
+            </Button>
+          </Link>
         </div>
       </header>
 

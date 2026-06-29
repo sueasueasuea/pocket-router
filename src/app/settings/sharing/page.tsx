@@ -106,13 +106,13 @@ export default function SharingSettingsPage() {
     <main className="flex flex-col min-h-full bg-zinc-50 dark:bg-zinc-950 pb-8">
       <header className="bg-white dark:bg-zinc-900 sticky top-0 z-10 border-b border-zinc-100 dark:border-zinc-800 w-full">
         <div className="max-w-3xl mx-auto w-full px-6 pt-6 pb-4 space-y-3">
-          <Link
-            href="/login"
-            className="inline-flex items-center text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 cursor-pointer bg-transparent border-none p-0"
           >
             <ArrowLeft className="w-3 h-3 mr-1" />
-            Back to profile
-          </Link>
+            Back
+          </button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
               Sharing
