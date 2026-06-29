@@ -331,7 +331,7 @@ function InviteRow({
                  className="cursor-pointer"
                 aria-label="Copy invite link"
                 onClick={() => onCopy(invite.token)}
-                disabled={invite.revoked}
+                disabled={invite.revoked || !!shareAccess}
               >
                 {justCopied ? (
                   <Check className="w-3.5 h-3.5 text-emerald-500" />

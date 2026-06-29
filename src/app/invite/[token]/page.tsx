@@ -178,11 +178,21 @@ export default function InviteLandingPage({
       });
 
       if (error) {
-        // Unique-constraint violation → already accepted. Treat as
-        // success and route forward.
+        // Unique-constraint violation → check if already accepted by current user.
         if (error.code === '23505') {
-          router.push(`/share/${token}`);
-          return;
+          const { data: myAccess } = await supabase
+            .from('share_access')
+            .select('id')
+            .eq('invite_id', state.preview.invite.id)
+            .eq('accepted_by', currentUser.id)
+            .maybeSingle();
+
+          if (myAccess) {
+            router.push(`/share/${token}`);
+            return;
+          } else {
+            throw new Error('This invite link has already been used by someone else.');
+          }
         }
         throw error;
       }
