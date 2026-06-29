@@ -2,6 +2,7 @@
 
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
 import { useInviteStore } from '@/hooks/useInviteStore';
+import { useAuthStore } from '@/hooks/useAuthStore';
 import { useHasHydrated } from '@/hooks/useHasHydrated';
 import { DashboardSummary } from '@/components/DashboardSummary';
 import { PocketCard } from '@/components/PocketCard';
@@ -14,14 +15,19 @@ import { sortByOrderAndDate } from '@/lib/utils';
 export default function Home() {
   const { pockets, allocations, settings } = usePocketRouterStore();
   const { acceptedShares, fetchAcceptedShares } = useInviteStore();
+  const user = useAuthStore((s) => s.user);
   const hasHydrated = useHasHydrated();
 
   // Sort by user-defined order, fall back to creation time for legacy items.
   const sortedPockets = useMemo(() => sortByOrderAndDate(pockets), [pockets]);
 
+  // Re-fetch when the authenticated user changes (including initial session load).
   useEffect(() => {
-    fetchAcceptedShares();
-  }, [fetchAcceptedShares]);
+    if (user) {
+      fetchAcceptedShares();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   if (!hasHydrated) {
     return <div className="p-6">Loading...</div>;
