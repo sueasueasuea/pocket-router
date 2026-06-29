@@ -109,16 +109,30 @@ export default function InviteLandingPage({
           if (profile?.display_name) ownerName = profile.display_name;
         }
 
-        // If we're logged in, check whether we already accepted.
+        // Check if this invite has already been accepted by anyone.
         let alreadyAccepted = false;
-        if (currentUser) {
-          const { data: existing } = await supabase
-            .from('share_access')
-            .select('id')
-            .eq('invite_id', inviteRow.id)
-            .eq('accepted_by', currentUser.id)
-            .maybeSingle();
-          alreadyAccepted = !!existing;
+        let acceptedBySomeoneElse = false;
+
+        const { data: existingAccess } = await supabase
+          .from('share_access')
+          .select('accepted_by')
+          .eq('invite_id', inviteRow.id)
+          .maybeSingle();
+
+        if (existingAccess) {
+          if (currentUser && existingAccess.accepted_by === currentUser.id) {
+            alreadyAccepted = true;
+          } else {
+            acceptedBySomeoneElse = true;
+          }
+        }
+
+        if (acceptedBySomeoneElse) {
+          setState({
+            kind: 'invalid',
+            message: 'This invite link has already been used by someone else.',
+          });
+          return;
         }
 
         const invite = mapInvite(inviteRow as DbInvite);
