@@ -122,39 +122,8 @@ function LoginPageInner() {
               <p className="font-medium">{user.email}</p>
             </div>
 
-            {/* Display name editor — keyed on user.id so a fresh mount
-                seeds `useState` from the freshly-loaded profile, but a
-                subsequent profile update (after Save) doesn't clobber
-                the user's in-progress edit. The skeleton covers the
-                brief window where `profile` is still null after login. */}
-            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
-              <div className="flex items-center gap-2 mb-3">
-                <UserIcon className="w-4 h-4 text-zinc-500" />
-                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Display name</span>
-              </div>
-              {profile ? (
-                <DisplayNameEditor key={user.id} initialName={profile.display_name} />
-              ) : (
-                <DisplayNameEditorSkeleton />
-              )}
-            </div>
-
-            {/* Currency Settings — keyed on hydration so the draft is
-                initialized from the persisted value rather than the default. */}
-            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
-              <div className="flex items-center gap-2 mb-3">
-                <Globe className="w-4 h-4 text-zinc-500" />
-                <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">Settings</span>
-              </div>
-              {hasHydrated ? (
-                <CurrencyEditor key="hydrated" />
-              ) : (
-                <CurrencyEditorSkeleton />
-              )}
-            </div>
-
             {/* Sharing entry — gate-kept to logged-in state. */}
-            <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 space-y-2">
+            <div className="flex flex-col border-t border-zinc-200 dark:border-zinc-800 pt-4 gap-4">
               <Link href="/settings/profile">
                 <Button variant="outline" className="w-full justify-start">
                   <SettingsIcon className="w-4 h-4 mr-2" />
