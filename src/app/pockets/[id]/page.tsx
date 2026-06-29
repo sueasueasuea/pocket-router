@@ -216,7 +216,7 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
         <div className="text-center space-y-3">
           <Wallet className="w-12 h-12 text-zinc-300 mx-auto" />
           <p className="font-semibold text-zinc-500">Pocket not found</p>
-          <Button variant="outline" onClick={() => router.push('/pockets')} className="rounded-full">
+          <Button variant="outline" onClick={() => router.push('/pockets')} className="rounded-full cursor-pointer">
             Back to Pockets
           </Button>
         </div>
@@ -255,7 +255,7 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-full -ml-2"
+              className="rounded-full -ml-2 cursor-pointer"
               onClick={() => router.push('/pockets')}
             >
               <ArrowLeft className="w-5 h-5" />
@@ -309,7 +309,7 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
           </div>
           <Button
             size="sm"
-            className="rounded-full h-8 text-xs"
+            className="rounded-full h-8 text-xs cursor-pointer"
             onClick={() => {
               setSelectedBankId('');
               setAllocAmount('');
@@ -336,7 +336,7 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
             </div>
             <Button
               size="sm"
-              className="mt-2 rounded-full"
+              className="mt-2 rounded-full cursor-pointer"
               onClick={() => {
                 setSelectedBankId('');
                 setAllocAmount('');
@@ -449,7 +449,7 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="mt-2 rounded-full gap-1.5 text-xs"
+                    className="mt-2 rounded-full gap-1.5 text-xs cursor-pointer"
                     onClick={() => {
                       setIsAddAllocOpen(false);
                       router.push('/banks');
@@ -481,7 +481,7 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
                   </Select>
                   <button
                     type="button"
-                    className="flex items-center gap-1.5 text-xs text-primary font-medium hover:underline mt-1"
+                    className="flex items-center gap-1.5 text-xs text-primary font-medium hover:underline mt-1 cursor-pointer"
                     onClick={() => {
                       setIsAddAllocOpen(false);
                       router.push('/banks');

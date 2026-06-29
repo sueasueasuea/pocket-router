@@ -4,15 +4,12 @@ import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/hooks/useAuthStore';
-import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
-import { useHasHydrated } from '@/hooks/useHasHydrated';
 import { supabase } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Wallet, Globe, Share2, Settings as SettingsIcon, User as UserIcon } from 'lucide-react';
+import { Wallet, Share2, Settings as SettingsIcon } from 'lucide-react';
 
 /**
  * Only allow same-origin relative paths as `next` redirects — defends
@@ -100,13 +97,7 @@ function LoginPageInner() {
   };
 
   const user = useAuthStore((state) => state.user);
-  const profile = useAuthStore((state) => state.profile);
   const signOut = useAuthStore((state) => state.signOut);
-
-  // `hasHydrated` gates the profile / currency editor so it doesn't flash the
-  // default currency before Zustand has finished reading localStorage.
-  // See `useHasHydrated` for the rationale.
-  const hasHydrated = useHasHydrated();
 
   if (user) {
     return (
@@ -125,13 +116,13 @@ function LoginPageInner() {
             {/* Sharing entry — gate-kept to logged-in state. */}
             <div className="flex flex-col border-t border-zinc-200 dark:border-zinc-800 pt-4 gap-4">
               <Link href="/settings/profile">
-                <Button variant="outline" className="w-full justify-start">
+                <Button variant="outline" className="w-full justify-start cursor-pointer">
                   <SettingsIcon className="w-4 h-4 mr-2" />
                   Open settings
                 </Button>
               </Link>
               <Link href="/settings/sharing">
-                <Button variant="outline" className="w-full justify-start">
+                <Button variant="outline" className="w-full justify-start cursor-pointer">
                   <Share2 className="w-4 h-4 mr-2" />
                   Sharing settings
                 </Button>
@@ -140,7 +131,7 @@ function LoginPageInner() {
 
             <Button
               variant="destructive"
-              className="w-full"
+              className="w-full cursor-pointer"
               onClick={async () => {
                 await signOut();
                 router.push('/');
@@ -151,7 +142,7 @@ function LoginPageInner() {
           </CardContent>
         </Card>
         <div className="mt-8">
-          <Button variant="link" className="text-zinc-500 text-sm" onClick={() => router.push('/')}>
+          <Button variant="link" className="text-zinc-500 text-sm cursor-pointer" onClick={() => router.push('/')}>
             Back to Dashboard
           </Button>
         </div>
@@ -250,7 +241,7 @@ function LoginPageInner() {
           <Button
             variant="outline"
             type="button"
-            className="w-full"
+            className="w-full cursor-pointer"
             onClick={handleGoogleLogin}
           >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -279,7 +270,7 @@ function LoginPageInner() {
           <p className="text-sm text-zinc-500">
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
             <button
-              className="text-primary hover:underline font-medium"
+              className="text-primary hover:underline font-medium cursor-pointer"
               onClick={() => {
                 setIsLogin(!isLogin);
                 setError(null);
@@ -292,148 +283,9 @@ function LoginPageInner() {
       </Card>
 
       <div className="mt-8">
-        <Button variant="link" className="text-zinc-500 text-sm" onClick={() => router.push('/')}>
+        <Button variant="link" className="text-zinc-500 text-sm cursor-pointer" onClick={() => router.push('/')}>
           Continue as guest (Offline mode)
         </Button>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Currency draft editor. Kept in its own component so it can be remounted
- * (via `key`) once Zustand hydration completes — that way `useState` can
- * initialize the draft directly from the persisted `settings.currency`
- * without needing a `setState`-in-`useEffect` sync.
- */
-function CurrencyEditor() {
-  const settings = usePocketRouterStore((state) => state.settings);
-  const updateSettings = usePocketRouterStore((state) => state.updateSettings);
-  const [currency, setCurrency] = useState(settings.currency);
-
-  return (
-    <div className="space-y-2">
-      <Label htmlFor="profile-currency">Default Currency</Label>
-      <div className="flex gap-2">
-        <Select value={currency} onValueChange={(val) => setCurrency(val ?? 'THB')}>
-          <SelectTrigger id="profile-currency" className="flex-1">
-            <SelectValue placeholder="Select Currency" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="THB">THB (฿)</SelectItem>
-            <SelectItem value="USD">USD ($)</SelectItem>
-            <SelectItem value="EUR">EUR (€)</SelectItem>
-            <SelectItem value="GBP">GBP (£)</SelectItem>
-            <SelectItem value="JPY">JPY (¥)</SelectItem>
-          </SelectContent>
-        </Select>
-        <Button
-          size="sm"
-          className="rounded-full"
-          onClick={() => updateSettings({ currency })}
-          disabled={currency === settings.currency}
-        >
-          Save
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function CurrencyEditorSkeleton() {
-  return (
-    <div className="space-y-2" aria-hidden>
-      <div className="h-4 w-24 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
-      <div className="flex gap-2">
-        <div className="h-9 flex-1 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
-        <div className="h-9 w-16 bg-zinc-200 dark:bg-zinc-800 rounded-full animate-pulse" />
-      </div>
-    </div>
-  );
-}
-
-/**
- * Inline display-name editor — mirrors the pattern used by
- * `CurrencyEditor`: a local draft held in `useState` that initializes
- * from `initialName` (which the parent passes once the profile is
- * loaded), plus a Save button that commits via the store and rolls
- * back on failure. Save is disabled while the draft matches the saved
- * value (so we don't issue redundant upserts) or while a save is
- * already in flight.
- */
-function DisplayNameEditor({ initialName }: { initialName: string }) {
-  const updateDisplayName = useAuthStore((state) => state.updateDisplayName);
-  // Seed from the prop so the first paint shows the right value
-  // without a setState-in-effect dance. The parent remounts this
-  // component (via `key={user.id}`) when the user changes, so a
-  // freshly-logged-in account always starts with the right draft.
-  const [draft, setDraft] = useState(initialName);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const trimmed = draft.trim();
-  const unchanged = trimmed === initialName.trim();
-  const tooShort = trimmed.length < 2;
-
-  const handleSave = async () => {
-    if (saving || unchanged || tooShort) return;
-    setSaving(true);
-    setError(null);
-    try {
-      await updateDisplayName(trimmed);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to save display name');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-2">
-      <Label htmlFor="profile-display-name">Display name</Label>
-      <div className="flex gap-2">
-        <Input
-          id="profile-display-name"
-          type="text"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              void handleSave();
-            }
-          }}
-          maxLength={64}
-          placeholder="How friends should see you"
-        />
-        <Button
-          size="sm"
-          className="rounded-full"
-          onClick={handleSave}
-          disabled={saving || unchanged || tooShort}
-        >
-          {saving ? 'Saving…' : 'Save'}
-        </Button>
-      </div>
-      {tooShort && draft.length > 0 && (
-        <p className="text-xs text-amber-600 dark:text-amber-400">
-          Display name must be at least 2 characters.
-        </p>
-      )}
-      {error && (
-        <p className="text-xs text-rose-600 dark:text-rose-400">{error}</p>
-      )}
-    </div>
-  );
-}
-
-function DisplayNameEditorSkeleton() {
-  return (
-    <div className="space-y-2" aria-hidden>
-      <div className="h-4 w-24 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
-      <div className="flex gap-2">
-        <div className="h-9 flex-1 bg-zinc-200 dark:bg-zinc-800 rounded animate-pulse" />
-        <div className="h-9 w-16 bg-zinc-200 dark:bg-zinc-800 rounded-full animate-pulse" />
       </div>
     </div>
   );

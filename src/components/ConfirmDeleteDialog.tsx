@@ -38,7 +38,7 @@ export function ConfirmDeleteDialog({
         <div className="flex flex-col gap-2 mt-2">
           <Button
             variant="destructive"
-            className="w-full rounded-full"
+            className="w-full rounded-full cursor-pointer"
             onClick={() => {
               onConfirm();
               onOpenChange(false);
@@ -48,7 +48,7 @@ export function ConfirmDeleteDialog({
           </Button>
           <Button
             variant="ghost"
-            className="w-full rounded-full"
+            className="w-full rounded-full cursor-pointer"
             onClick={() => onOpenChange(false)}
           >
             Cancel

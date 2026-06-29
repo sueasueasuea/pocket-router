@@ -461,7 +461,7 @@ function SharedPocketCard({
                                 amount: String(a.amount),
                               })
                             }
-                            className="text-zinc-400 hover:text-primary p-1"
+                            className="text-zinc-400 hover:text-primary p-1 cursor-pointer"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
@@ -469,7 +469,7 @@ function SharedPocketCard({
                             type="button"
                             aria-label="Delete allocation"
                             onClick={() => setDeletingId(a.id)}
-                            className="text-zinc-400 hover:text-rose-500 p-1"
+                            className="text-zinc-400 hover:text-rose-500 p-1 cursor-pointer"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -559,7 +559,7 @@ function AddBankButton({ onAdd }: { onAdd: (bank: Bank) => Promise<boolean> }) {
 
   return (
     <>
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+      <Button size="sm" variant="outline"  className="cursor-pointer">
         <Plus className="w-3.5 h-3.5 mr-1.5" />
         Add bank
       </Button>
@@ -623,8 +623,7 @@ function AddBankButton({ onAdd }: { onAdd: (bank: Bank) => Promise<boolean> }) {
                     key={c}
                     type="button"
                     aria-label={`Pick color ${c}`}
-                    onClick={() => setColor(c)}
-                    className={`w-7 h-7 rounded-full ring-2 transition-all ${
+                    className={`w-7 h-7 rounded-full ring-2 transition-all cursor-pointer ${
                       color === c
                         ? 'ring-primary scale-110'
                         : 'ring-transparent'
@@ -655,7 +654,7 @@ function AddPocketButton({ onAdd }: { onAdd: (pocket: Pocket) => Promise<boolean
 
   return (
     <>
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+      <Button size="sm" variant="outline"  className="cursor-pointer">
         <Plus className="w-3.5 h-3.5 mr-1.5" />
         Add pocket
       </Button>
@@ -717,8 +716,7 @@ function AddPocketButton({ onAdd }: { onAdd: (pocket: Pocket) => Promise<boolean
                   <button
                     key={e}
                     type="button"
-                    onClick={() => setIcon(e)}
-                    className={`w-8 h-8 rounded-lg text-lg flex items-center justify-center transition-all ${
+                    className={`w-8 h-8 rounded-lg text-lg flex items-center justify-center transition-all cursor-pointer ${
                       icon === e
                         ? 'bg-primary/10 ring-2 ring-primary'
                         : 'bg-zinc-100 dark:bg-zinc-800'

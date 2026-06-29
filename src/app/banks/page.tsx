@@ -256,7 +256,7 @@ export default function ManageBanksPage() {
               setIsAddBankOpen(true);
             }}
             size="icon"
-            className="rounded-full"
+            className="rounded-full cursor-pointer"
           >
             <Plus className="w-4 h-4" />
           </Button>
@@ -279,7 +279,7 @@ export default function ManageBanksPage() {
             </div>
             <Button
               size="sm"
-              className="mt-2 rounded-full"
+              className="mt-2 rounded-full cursor-pointer"
               onClick={() => {
                 resetBankForm();
                 setIsAddBankOpen(true);
@@ -400,7 +400,7 @@ export default function ManageBanksPage() {
                           <div className="flex flex-col border-l border-white/10">
                             <button
                               aria-label="Edit bank"
-                              className="flex-1 flex items-center justify-center px-3 min-h-[44px] min-w-[44px] hover:bg-white/10 transition-colors duration-150"
+                              className="flex-1 flex items-center justify-center px-3 min-h-[44px] min-w-[44px] hover:bg-white/10 transition-colors duration-150 cursor-pointer"
                               onClick={() => openEditBankDialog(bank)}
                             >
                               <Edit2 className="w-4 h-4 text-white/80" />
@@ -408,7 +408,7 @@ export default function ManageBanksPage() {
                             <div className="border-t border-white/10" />
                             <button
                               aria-label="Delete bank"
-                              className="flex-1 flex items-center justify-center px-3 min-h-[44px] min-w-[44px] hover:bg-rose-500/20 transition-colors duration-150"
+                              className="flex-1 flex items-center justify-center px-3 min-h-[44px] min-w-[44px] hover:bg-rose-500/20 transition-colors duration-150 cursor-pointer"
                               onClick={() => handleDeleteBank(bank)}
                             >
                               <Trash2 className="w-4 h-4 text-white/80" />
@@ -483,7 +483,7 @@ export default function ManageBanksPage() {
                   <button
                     key={color.value}
                     type="button"
-                    className="w-7 h-7 rounded-full border-2 transition-all relative flex items-center justify-center"
+                    className="w-7 h-7 rounded-full border-2 transition-all relative flex items-center justify-center cursor-pointer"
                     style={{
                       backgroundColor: color.value,
                       borderColor: bankThemeColor === color.value ? '#fff' : 'transparent',
@@ -573,7 +573,7 @@ export default function ManageBanksPage() {
                   <button
                     key={color.value}
                     type="button"
-                    className="w-7 h-7 rounded-full border-2 transition-all relative flex items-center justify-center"
+                    className="w-7 h-7 rounded-full border-2 transition-all relative flex items-center justify-center cursor-pointer"
                     style={{
                       backgroundColor: color.value,
                       borderColor: bankThemeColor === color.value ? '#fff' : 'transparent',
@@ -613,7 +613,7 @@ export default function ManageBanksPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit" className="w-full rounded-full">
+              <Button type="submit" className="w-full rounded-full cursor-pointer">
                 Save Changes
               </Button>
             </DialogFooter>

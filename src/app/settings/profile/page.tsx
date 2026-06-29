@@ -214,7 +214,7 @@ function ProfileEditor({
             <Button
               onClick={handleSave}
               disabled={!canSave}
-              className="rounded-full"
+              className="rounded-full cursor-pointer"
             >
               {saving ? (
                 <>
@@ -308,7 +308,7 @@ function CurrencyEditor() {
           </SelectContent>
         </Select>
         <Button
-          className="rounded-full"
+          className="rounded-full cursor-pointer"
           onClick={() => updateSettings({ currency })}
           disabled={currency === settings.currency}
         >

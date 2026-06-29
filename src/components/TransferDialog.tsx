@@ -201,12 +201,12 @@ function TransferForm({ fromBank, toBank, maxAmount, currency, onConfirm }: Tran
             <button
               key={pct}
               type="button"
-              onClick={() => handleQuickFill(pct)}
-              className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition-all duration-200 ${
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg border transition-all duration-200 cursor-pointer ${
                 percentage === pct
                   ? 'bg-primary text-primary-foreground border-primary shadow-sm'
                   : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-700 hover:border-primary/50 hover:text-primary'
               }`}
+              onClick={() => handleQuickFill(pct)}
             >
               {pct}%
             </button>
@@ -227,7 +227,7 @@ function TransferForm({ fromBank, toBank, maxAmount, currency, onConfirm }: Tran
           <Button
             type="submit"
             disabled={!isValid || showSuccess}
-            className="w-full rounded-full"
+            className="w-full rounded-full cursor-pointer"
           >
             {showSuccess ? (
               <span className="flex items-center gap-2">

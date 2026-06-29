@@ -45,7 +45,7 @@ export function ErrorModal() {
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button className="w-full rounded-full" onClick={clearError}>
+          <Button className="w-full rounded-full cursor-pointer" onClick={clearError}>
             OK
           </Button>
         </DialogFooter>

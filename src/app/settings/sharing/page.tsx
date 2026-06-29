@@ -144,7 +144,7 @@ export default function SharingSettingsPage() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-              <div className="flex-1 space-y-2">
+              <div className="flex-1 space-y-4 cursor-pointer">
                 <label className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                   Permission
                 </label>
@@ -164,7 +164,7 @@ export default function SharingSettingsPage() {
               <Button
                 onClick={handleCreate}
                 disabled={creating || atCap}
-                className="rounded-full"
+                className="rounded-full cursor-pointer"
               >
                 {creating ? (
                   <>
@@ -300,7 +300,7 @@ function InviteRow({
                     {effectivePerm === 'edit' ? 'View + Edit' : 'View only'}
                   </p>
                   {invite.revoked && (
-                    <span className="text-[10px] font-bold uppercase tracking-wide bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded">
+                    <span className="cursor-pointer flex-1 py-1.5 text-xs font-bold uppercase tracking-wide bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded">
                       Revoked
                     </span>
                   )}
@@ -328,8 +328,9 @@ function InviteRow({
               <Button
                 size="icon-sm"
                 variant="outline"
-                onClick={() => onCopy(invite.token)}
+                 className="cursor-pointer"
                 aria-label="Copy invite link"
+                onClick={() => onCopy(invite.token)}
                 disabled={invite.revoked}
               >
                 {justCopied ? (
@@ -342,7 +343,7 @@ function InviteRow({
                 <Button
                   size="icon-sm"
                   variant="outline"
-                  onClick={() => setConfirmRevoke(true)}
+                  className="cursor-pointer"
                   aria-label="Revoke invite"
                 >
                   <Trash2 className="w-3.5 h-3.5 text-zinc-500" />
@@ -375,7 +376,7 @@ function InviteRow({
             <Button
               size="sm"
               variant="ghost"
-              className="w-full text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+              className="w-full text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer"
               onClick={() => setConfirmDeleteShare(true)}
             >
               <Trash2 className="w-3.5 h-3.5 mr-1.5" />

@@ -42,7 +42,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">My Pockets</h2>
             <Link href="/pockets">
-              <Button variant="ghost" size="sm" className="h-8 text-xs font-semibold text-primary">
+              <Button variant="ghost" size="sm" className="h-8 text-xs font-semibold text-primary cursor-pointer">
                 Manage <ArrowRight className="w-3 h-3 ml-1" />
               </Button>
             </Link>

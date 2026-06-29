@@ -305,14 +305,14 @@ export default function InviteLandingPage({
               </p>
               {state.alreadyAccepted ? (
                 <Button
-                  className="w-full"
+                  className="w-full cursor-pointer"
                   onClick={() => router.push(`/share/${token}`)}
                 >
                   Continue to view wallet
                 </Button>
               ) : (
                 <Button
-                  className="w-full"
+                  className="w-full cursor-pointer"
                   onClick={handleAccept}
                   disabled={accepting}
                 >

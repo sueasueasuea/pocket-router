@@ -208,7 +208,7 @@ export default function PocketsPage() {
           <Button 
             onClick={() => { resetForm(); setIsAddOpen(true); }} 
             size="icon" 
-            className="rounded-full"
+            className="rounded-full cursor-pointer"
           >
             <Plus className="w-4 h-4" />
           </Button>
@@ -227,7 +227,7 @@ export default function PocketsPage() {
                 Create virtual pockets to start dividing your budget.
               </p>
             </div>
-            <Button size="sm" className="mt-2 rounded-full" onClick={() => setIsAddOpen(true)}>
+            <Button size="sm" className="mt-2 rounded-full cursor-pointer" onClick={() => setIsAddOpen(true)}>
               Create Your First Pocket
             </Button>
           </div>
@@ -288,7 +288,7 @@ export default function PocketsPage() {
                             aria-label="Edit pocket"
                             variant="ghost"
                             size="icon"
-                            className="h-11 w-11 rounded-full"
+                            className="h-11 w-11 rounded-full cursor-pointer"
                             onClick={(e) => { e.stopPropagation(); openEditDialog(pocket); }}
                           >
                             <Edit2 className="w-4 h-4 text-zinc-500" />
@@ -297,7 +297,7 @@ export default function PocketsPage() {
                             aria-label="Delete pocket"
                             variant="ghost"
                             size="icon"
-                            className="h-11 w-11 rounded-full hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                            className="h-11 w-11 rounded-full hover:bg-rose-50 dark:hover:bg-rose-950/20 cursor-pointer"
                             onClick={(e) => { e.stopPropagation(); handleDeletePocket(pocket.id); }}
                           >
                             <Trash2 className="w-4 h-4 text-rose-500" />
@@ -370,12 +370,11 @@ export default function PocketsPage() {
                   <button
                     key={emoji}
                     type="button"
-                    className={`w-8 h-8 text-lg rounded-md flex items-center justify-center transition-all ${
+                    className={`w-8 cursor-pointer h-8 text-lg rounded-md flex items-center justify-center transition-all ${
                       icon === emoji 
                         ? 'bg-primary text-white scale-110 shadow-sm' 
                         : 'hover:bg-zinc-200 dark:hover:bg-zinc-800'
                     }`}
-                    onClick={() => setIcon(emoji)}
                   >
                     {emoji}
                   </button>
@@ -422,12 +421,11 @@ export default function PocketsPage() {
                   <button
                     key={emoji}
                     type="button"
-                    className={`w-8 h-8 text-lg rounded-md flex items-center justify-center transition-all ${
+                    className={`w-8 cursor-pointer h-8 text-lg rounded-md flex items-center justify-center transition-all ${
                       icon === emoji 
                         ? 'bg-primary text-white scale-110 shadow-sm' 
                         : 'hover:bg-zinc-200 dark:hover:bg-zinc-800'
                     }`}
-                    onClick={() => setIcon(emoji)}
                   >
                     {emoji}
                   </button>
@@ -435,7 +433,7 @@ export default function PocketsPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit" className="w-full rounded-full">Save Changes</Button>
+              <Button type="submit" className="w-full rounded-full cursor-pointer">Save Changes</Button>
             </DialogFooter>
           </form>
         </DialogContent>
