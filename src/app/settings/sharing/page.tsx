@@ -28,7 +28,7 @@ import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 import { useAuthStore } from '@/hooks/useAuthStore';
 import { useInviteStore } from '@/hooks/useInviteStore';
 import { buildInviteUrl } from '@/lib/invite-token';
-import type { InvitePermission, ShareEntry } from '@/types';
+import type { InvitePermission, ShareEntry, AcceptedShareEntry } from '@/types';
 
 const MAX_INVITES = 50;
 
@@ -39,13 +39,16 @@ export default function SharingSettingsPage() {
 
   const {
     entries,
+    acceptedShares,
     isLoading,
     lastError,
     fetchEntries,
+    fetchAcceptedShares,
     createInvite,
     revokeInvite,
     updatePermission,
     deleteShareAccess,
+    deleteAcceptedShare,
   } = useInviteStore();
 
   const [creating, setCreating] = useState(false);
@@ -61,7 +64,10 @@ export default function SharingSettingsPage() {
 
   // Fetch entries once on mount (and when user changes).
   useEffect(() => {
-    if (user) fetchEntries();
+    if (user) {
+      fetchEntries();
+      fetchAcceptedShares();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -244,6 +250,40 @@ export default function SharingSettingsPage() {
             </div>
           )}
         </section>
+
+        {/* Accepted shares (shared with me) */}
+        <section className="space-y-3 mt-4">
+          <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+            Wallets shared with you
+          </h2>
+
+          {isLoading && acceptedShares.length === 0 ? (
+            <div className="flex items-center justify-center p-12 text-zinc-400">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          ) : acceptedShares.length === 0 ? (
+            <Card className="border-dashed border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+              <CardContent className="p-8 text-center space-y-1">
+                <p className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
+                  No shared wallets yet
+                </p>
+                <p className="text-xs text-zinc-500 max-w-[260px] mx-auto">
+                  When someone shares their wallet and you accept, it will appear here.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-2">
+              {acceptedShares.map((share) => (
+                <AcceptedShareRow
+                  key={share.id}
+                  share={share}
+                  onLeave={() => deleteAcceptedShare(share.id)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );
@@ -406,6 +446,75 @@ function InviteRow({
         onConfirm={() => {
           setConfirmDeleteShare(false);
           onDeleteShare();
+        }}
+      />
+    </>
+  );
+}
+
+function AcceptedShareRow({
+  share,
+  onLeave,
+}: {
+  share: AcceptedShareEntry;
+  onLeave: () => void;
+}) {
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const router = useRouter();
+
+  return (
+    <>
+      <Card className="bg-white dark:bg-zinc-900 border-zinc-100 dark:border-zinc-800">
+        <CardContent className="p-4 flex items-center justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <div
+              className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                share.permission === 'edit'
+                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                  : 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'
+              }`}
+            >
+              {share.permission === 'edit' ? <Edit3 className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
+                {share.ownerName}&apos;s Wallet
+              </p>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Permission: <span className="font-medium text-zinc-700 dark:text-zinc-300 capitalize">{share.permission === 'edit' ? 'View + Edit' : 'View Only'}</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              className="cursor-pointer text-xs"
+              onClick={() => router.push(`/share/${share.token}`)}
+            >
+              View
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="outline"
+              className="cursor-pointer"
+              aria-label="Leave shared wallet"
+              onClick={() => setConfirmLeave(true)}
+            >
+              <Trash2 className="w-3.5 h-3.5 text-zinc-500 hover:text-rose-600" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <ConfirmDeleteDialog
+        open={confirmLeave}
+        onOpenChange={setConfirmLeave}
+        title="Leave this shared wallet?"
+        description="You will lose access to this wallet immediately. You will need a new invite to join again."
+        onConfirm={() => {
+          setConfirmLeave(false);
+          onLeave();
         }}
       />
     </>

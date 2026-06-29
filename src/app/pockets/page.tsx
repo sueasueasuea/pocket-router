@@ -15,14 +15,7 @@ import { Plus, Trash2, Edit2, Wallet, GripVertical } from 'lucide-react';
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 import { DraggableListItem } from '@/components/DraggableListItem';
 import { sortByOrderAndDate } from '@/lib/utils';
-
-const PRESET_EMOJIS = [
-  '🏠', '💳', '🏥', '🚗', '✈️', '🎓', '🍔', '🛍️',
-  '🎁', '💰', '🕹️', '📈', '💡', '👪', '🐱', '🌴',
-  '☕', '🎵', '📱', '🏋️', '🎮', '🏖️', '🍕', '🚀',
-  '💎', '🎯', '📚', '🏡', '💼', '🛡️', '⚡', '🌟',
-  '🧳', '🎬', '🏦', '💸', '🩺', '🎂', '👗', '🔧',
-];
+import { PocketDialog, PocketFormData } from '@/components/PocketDialog';
 
 export default function PocketsPage() {
   const { pockets, allocations, settings, addPocket, updatePocket, deletePocket, reorderPockets } = usePocketRouterStore();
@@ -43,11 +36,6 @@ export default function PocketsPage() {
   const announcePocket = useCallback((message: string) => {
     setPocketLiveMessage(message);
   }, []);
-
-  // Form States
-  const [name, setName] = useState('');
-  const [targetAmount, setTargetAmount] = useState('');
-  const [icon, setIcon] = useState(PRESET_EMOJIS[0]);
 
   // Sort by user-defined order, fall back to creation time for legacy items.
   const sortedPockets = useMemo(() => sortByOrderAndDate(pockets), [pockets]);
@@ -107,15 +95,12 @@ export default function PocketsPage() {
 
   if (!hasHydrated) return <div className="p-6">Loading...</div>;
 
-  const handleAddPocket = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name) return;
-
+  const handleAddPocket = (data: PocketFormData) => {
     const newPocket: Pocket = {
       id: crypto.randomUUID(),
-      name,
-      targetAmount: targetAmount ? parseFloat(targetAmount) : undefined,
-      icon,
+      name: data.name,
+      targetAmount: data.targetAmount,
+      icon: data.icon,
       createdAt: new Date().toISOString()
     };
 
@@ -124,14 +109,13 @@ export default function PocketsPage() {
     setIsAddOpen(false);
   };
 
-  const handleEditPocket = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingPocket || !name) return;
+  const handleEditPocket = (data: PocketFormData) => {
+    if (!editingPocket) return;
 
     updatePocket(editingPocket.id, {
-      name,
-      targetAmount: targetAmount ? parseFloat(targetAmount) : undefined,
-      icon
+      name: data.name,
+      targetAmount: data.targetAmount,
+      icon: data.icon
     });
 
     resetForm();
@@ -140,9 +124,6 @@ export default function PocketsPage() {
 
   const openEditDialog = (pocket: Pocket) => {
     setEditingPocket(pocket);
-    setName(pocket.name);
-    setTargetAmount(pocket.targetAmount ? pocket.targetAmount.toString() : '');
-    setIcon(pocket.icon);
     setIsEditOpen(true);
   };
 
@@ -158,9 +139,6 @@ export default function PocketsPage() {
   };
 
   const resetForm = () => {
-    setName('');
-    setTargetAmount('');
-    setIcon(PRESET_EMOJIS[0]);
     setEditingPocket(null);
   };
 
@@ -327,111 +305,20 @@ export default function PocketsPage() {
         )}
       </div>
 
-      {/* Add Pocket Dialog */}
-      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="max-w-sm rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>Create Pocket</DialogTitle>
-            <DialogDescription>Add a virtual category for specific savings goals.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAddPocket} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Pocket Name</Label>
-              <Input 
-                id="name" 
-                placeholder="e.g. Rent, Emergency Fund" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                required 
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="targetAmount">Target Amount (Optional)</Label>
-              <Input 
-                id="targetAmount" 
-                type="number" 
-                placeholder="Leave blank for no limit" 
-                value={targetAmount} 
-                onChange={(e) => setTargetAmount(e.target.value)} 
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Emoji / Icon</Label>
-              <div className="flex gap-2 flex-wrap max-h-24 overflow-y-auto p-1 border rounded-lg bg-zinc-50 dark:bg-zinc-950">
-                {PRESET_EMOJIS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => setIcon(emoji)}
-                    className={`w-8 cursor-pointer h-8 text-lg rounded-md flex items-center justify-center transition-all ${
-                      icon === emoji 
-                        ? 'bg-primary text-white scale-110 shadow-sm' 
-                        : 'hover:bg-zinc-200 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="submit" className="w-full rounded-full">Create Pocket</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <PocketDialog
+        open={isAddOpen}
+        onOpenChange={setIsAddOpen}
+        mode="add"
+        onSubmit={handleAddPocket}
+      />
 
-      {/* Edit Pocket Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-sm rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>Edit Pocket</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleEditPocket} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">Pocket Name</Label>
-              <Input 
-                id="edit-name" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)} 
-                required 
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-targetAmount">Target Amount (Optional)</Label>
-              <Input 
-                id="edit-targetAmount" 
-                type="number" 
-                placeholder="Leave blank for no limit" 
-                value={targetAmount} 
-                onChange={(e) => setTargetAmount(e.target.value)} 
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Emoji / Icon</Label>
-              <div className="flex gap-2 flex-wrap max-h-24 overflow-y-auto p-1 border rounded-lg bg-zinc-50 dark:bg-zinc-950">
-                {PRESET_EMOJIS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    type="button"
-                    onClick={() => setIcon(emoji)}
-                    className={`w-8 cursor-pointer h-8 text-lg rounded-md flex items-center justify-center transition-all ${
-                      icon === emoji 
-                        ? 'bg-primary text-white scale-110 shadow-sm' 
-                        : 'hover:bg-zinc-200 dark:hover:bg-zinc-800'
-                    }`}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="submit" className="w-full rounded-full cursor-pointer">Save Changes</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <PocketDialog
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        mode="edit"
+        initialData={editingPocket}
+        onSubmit={handleEditPocket}
+      />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDeleteDialog

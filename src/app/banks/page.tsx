@@ -20,27 +20,7 @@ import {
 } from 'lucide-react';
 import { DraggableListItem } from '@/components/DraggableListItem';
 import { sortByOrderAndDate } from '@/lib/utils';
-
-const PRESET_COLORS = [
-  { name: 'Emerald', value: '#10b981' },
-  { name: 'Teal', value: '#14b8a6' },
-  { name: 'Cyan', value: '#06b6d4' },
-  { name: 'Sky', value: '#0ea5e9' },
-  { name: 'Blue', value: '#3b82f6' },
-  { name: 'Indigo', value: '#6366f1' },
-  { name: 'Violet', value: '#8b5cf6' },
-  { name: 'Purple', value: '#a855f7' },
-  { name: 'Fuchsia', value: '#d946ef' },
-  { name: 'Pink', value: '#ec4899' },
-  { name: 'Rose', value: '#f43f5e' },
-  { name: 'Red', value: '#ef4444' },
-  { name: 'Orange', value: '#f97316' },
-  { name: 'Amber', value: '#f59e0b' },
-  { name: 'Yellow', value: '#eab308' },
-  { name: 'Lime', value: '#84cc16' },
-  { name: 'Green', value: '#22c55e' },
-  { name: 'Slate', value: '#64748b' },
-];
+import { BankDialog, BankFormData } from '@/components/BankDialog';
 
 export default function ManageBanksPage() {
   const {
@@ -57,10 +37,6 @@ export default function ManageBanksPage() {
 
   // Add bank dialog
   const [isAddBankOpen, setIsAddBankOpen] = useState(false);
-  const [bankName, setBankName] = useState('');
-  const [bankInterestRate, setBankInterestRate] = useState('');
-  const [bankLogoUrl, setBankLogoUrl] = useState('');
-  const [bankThemeColor, setBankThemeColor] = useState(PRESET_COLORS[0].value);
 
   // Edit bank dialog
   const [isEditBankOpen, setIsEditBankOpen] = useState(false);
@@ -160,23 +136,16 @@ export default function ManageBanksPage() {
   }, []);
 
   const resetBankForm = () => {
-    setBankName('');
-    setBankInterestRate('');
-    setBankLogoUrl('');
-    setBankThemeColor(PRESET_COLORS[0].value);
     setEditingBank(null);
   };
 
-  const handleAddBank = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bankName || !bankInterestRate) return;
-
+  const handleAddBank = (data: BankFormData) => {
     addBank({
       id: crypto.randomUUID(),
-      name: bankName,
-      interestRate: parseFloat(bankInterestRate),
-      logoUrl: bankLogoUrl || undefined,
-      themeColor: bankThemeColor,
+      name: data.name,
+      interestRate: data.interestRate,
+      logoUrl: data.logoUrl,
+      themeColor: data.themeColor,
       createdAt: new Date().toISOString(),
     });
 
@@ -186,22 +155,17 @@ export default function ManageBanksPage() {
 
   const openEditBankDialog = (bank: Bank) => {
     setEditingBank(bank);
-    setBankName(bank.name);
-    setBankInterestRate(bank.interestRate.toString());
-    setBankLogoUrl(bank.logoUrl || '');
-    setBankThemeColor(bank.themeColor);
     setIsEditBankOpen(true);
   };
 
-  const handleEditBank = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingBank || !bankName || !bankInterestRate) return;
+  const handleEditBank = (data: BankFormData) => {
+    if (!editingBank) return;
 
     updateBank(editingBank.id, {
-      name: bankName,
-      interestRate: parseFloat(bankInterestRate),
-      logoUrl: bankLogoUrl || undefined,
-      themeColor: bankThemeColor,
+      name: data.name,
+      interestRate: data.interestRate,
+      logoUrl: data.logoUrl,
+      themeColor: data.themeColor,
     });
 
     resetBankForm();
@@ -429,189 +393,20 @@ export default function ManageBanksPage() {
         )}
       </div>
 
-      {/* Add Bank Dialog */}
-      <Dialog open={isAddBankOpen} onOpenChange={setIsAddBankOpen}>
-        <DialogContent className="max-w-sm rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>Add Bank</DialogTitle>
-            <DialogDescription>Create a new bank account profile.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAddBank} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="bank-name">Bank Name</Label>
-              <Input
-                id="bank-name"
-                placeholder="e.g. Kept by Krungsri"
-                value={bankName}
-                onChange={(e) => setBankName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bank-rate">Interest Rate (%)</Label>
-              <Input
-                id="bank-rate"
-                type="number"
-                step="0.01"
-                placeholder="e.g. 1.5"
-                value={bankInterestRate}
-                onChange={(e) => setBankInterestRate(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bank-logo">Logo URL (Optional)</Label>
-              <Input
-                id="bank-logo"
-                placeholder="https://..."
-                value={bankLogoUrl}
-                onChange={(e) => setBankLogoUrl(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Theme Color</Label>
-              <div className="flex gap-2 flex-wrap">
-                {PRESET_COLORS.map((color) => (
-                  <button
-                    key={color.value}
-                    type="button"
-                    className="w-7 h-7 rounded-full border-2 transition-all relative flex items-center justify-center cursor-pointer"
-                    style={{
-                      backgroundColor: color.value,
-                      borderColor: bankThemeColor === color.value ? '#fff' : 'transparent',
-                      boxShadow: bankThemeColor === color.value ? '0 0 0 2px #000' : 'none',
-                    }}
-                    onClick={() => setBankThemeColor(color.value)}
-                  >
-                    {bankThemeColor === color.value && (
-                      <span className="w-2 h-2 rounded-full bg-white block" />
-                    )}
-                  </button>
-                ))}
-                {/* Custom color picker */}
-                <label
-                  className="w-7 h-7 rounded-full border-2 border-dashed border-zinc-300 dark:border-zinc-600 flex items-center justify-center cursor-pointer hover:border-zinc-500 transition-colors relative overflow-hidden"
-                  title="Custom color"
-                  style={{
-                    backgroundColor: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? bankThemeColor : undefined,
-                    borderStyle: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? 'solid' : 'dashed',
-                    borderColor: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? '#fff' : undefined,
-                    boxShadow: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? '0 0 0 2px #000' : 'none',
-                  }}
-                >
-                  {PRESET_COLORS.some(c => c.value === bankThemeColor) && (
-                    <span className="text-[10px] font-bold text-zinc-400">+</span>
-                  )}
-                  {!PRESET_COLORS.some(c => c.value === bankThemeColor) && (
-                    <span className="w-2 h-2 rounded-full bg-white block" />
-                  )}
-                  <input
-                    type="color"
-                    value={bankThemeColor}
-                    onChange={(e) => setBankThemeColor(e.target.value)}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                </label>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="submit" className="w-full rounded-full">
-                Add Bank
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <BankDialog
+        open={isAddBankOpen}
+        onOpenChange={setIsAddBankOpen}
+        mode="add"
+        onSubmit={handleAddBank}
+      />
 
-      {/* Edit Bank Dialog */}
-      <Dialog open={isEditBankOpen} onOpenChange={setIsEditBankOpen}>
-        <DialogContent className="max-w-sm rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>Edit Bank</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleEditBank} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-bank-name">Bank Name</Label>
-              <Input
-                id="edit-bank-name"
-                value={bankName}
-                onChange={(e) => setBankName(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-bank-rate">Interest Rate (%)</Label>
-              <Input
-                id="edit-bank-rate"
-                type="number"
-                step="0.01"
-                value={bankInterestRate}
-                onChange={(e) => setBankInterestRate(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-bank-logo">Logo URL (Optional)</Label>
-              <Input
-                id="edit-bank-logo"
-                value={bankLogoUrl}
-                onChange={(e) => setBankLogoUrl(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Theme Color</Label>
-              <div className="flex gap-2 flex-wrap">
-                {PRESET_COLORS.map((color) => (
-                  <button
-                    key={color.value}
-                    type="button"
-                    className="w-7 h-7 rounded-full border-2 transition-all relative flex items-center justify-center cursor-pointer"
-                    style={{
-                      backgroundColor: color.value,
-                      borderColor: bankThemeColor === color.value ? '#fff' : 'transparent',
-                      boxShadow: bankThemeColor === color.value ? '0 0 0 2px #000' : 'none',
-                    }}
-                    onClick={() => setBankThemeColor(color.value)}
-                  >
-                    {bankThemeColor === color.value && (
-                      <span className="w-2 h-2 rounded-full bg-white block" />
-                    )}
-                  </button>
-                ))}
-                {/* Custom color picker */}
-                <label
-                  className="w-7 h-7 rounded-full border-2 border-dashed border-zinc-300 dark:border-zinc-600 flex items-center justify-center cursor-pointer hover:border-zinc-500 transition-colors relative overflow-hidden"
-                  title="Custom color"
-                  style={{
-                    backgroundColor: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? bankThemeColor : undefined,
-                    borderStyle: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? 'solid' : 'dashed',
-                    borderColor: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? '#fff' : undefined,
-                    boxShadow: !PRESET_COLORS.some(c => c.value === bankThemeColor) ? '0 0 0 2px #000' : 'none',
-                  }}
-                >
-                  {PRESET_COLORS.some(c => c.value === bankThemeColor) && (
-                    <span className="text-[10px] font-bold text-zinc-400">+</span>
-                  )}
-                  {!PRESET_COLORS.some(c => c.value === bankThemeColor) && (
-                    <span className="w-2 h-2 rounded-full bg-white block" />
-                  )}
-                  <input
-                    type="color"
-                    value={bankThemeColor}
-                    onChange={(e) => setBankThemeColor(e.target.value)}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                </label>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="submit" className="w-full rounded-full cursor-pointer">
-                Save Changes
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <BankDialog
+        open={isEditBankOpen}
+        onOpenChange={setIsEditBankOpen}
+        mode="edit"
+        initialData={editingBank}
+        onSubmit={handleEditBank}
+      />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDeleteDialog

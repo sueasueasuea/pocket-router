@@ -83,3 +83,13 @@ export interface InvitePreview {
     displayName: string;
   };
 }
+
+export interface AcceptedShareEntry {
+  id: string; // share_access.id
+  inviteId: string;
+  ownerId: string;
+  ownerName: string;
+  permission: InvitePermission;
+  acceptedAt: string;
+  token: string; // invite.token
+}

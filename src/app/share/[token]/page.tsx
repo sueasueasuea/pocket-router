@@ -30,17 +30,8 @@ import { useSharedViewStore } from '@/hooks/useSharedViewStore';
 import { useHasHydrated } from '@/hooks/useHasHydrated';
 import type { Bank, Pocket, Allocation, InvitePermission } from '@/types';
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
-
-const PRESET_COLORS = [
-  '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1',
-  '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#ef4444',
-  '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e', '#64748b',
-];
-
-const PRESET_EMOJIS = [
-  '🏠', '💳', '🏥', '🚗', '✈️', '🎓', '🍔', '🛍️',
-  '🎁', '💰', '🕹️', '📈', '💡', '👪', '🐱', '🌴',
-];
+import { BankDialog } from '@/components/BankDialog';
+import { PocketDialog } from '@/components/PocketDialog';
 
 export default function ShareViewPage({
   params,
@@ -552,189 +543,63 @@ function SharedPocketCard({
 
 function AddBankButton({ onAdd }: { onAdd: (bank: Bank) => Promise<boolean> }) {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [rate, setRate] = useState('1.5');
-  const [color, setColor] = useState(PRESET_COLORS[0]);
-  const [submitting, setSubmitting] = useState(false);
 
   return (
     <>
-      <Button size="sm" variant="outline"  className="cursor-pointer">
+      <Button size="sm" variant="outline" className="cursor-pointer" onClick={() => setOpen(true)}>
         <Plus className="w-3.5 h-3.5 mr-1.5" />
         Add bank
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add bank</DialogTitle>
-            <DialogDescription>
-              Add a new bank to the owner&apos;s wallet.
-            </DialogDescription>
-          </DialogHeader>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setSubmitting(true);
-              const bank: Bank = {
-                id: crypto.randomUUID(),
-                name: name.trim(),
-                interestRate: parseFloat(rate) || 0,
-                themeColor: color,
-                createdAt: new Date().toISOString(),
-              };
-              const ok = await onAdd(bank);
-              setSubmitting(false);
-              if (ok) {
-                setName('');
-                setRate('1.5');
-                setColor(PRESET_COLORS[0]);
-                setOpen(false);
-              }
-            }}
-            className="space-y-3"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="bank-name">Name</Label>
-              <Input
-                id="bank-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. KBank"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bank-rate">Interest rate (%)</Label>
-              <Input
-                id="bank-rate"
-                type="number"
-                min={0}
-                step="0.01"
-                value={rate}
-                onChange={(e) => setRate(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Color</Label>
-              <div className="flex flex-wrap gap-2">
-                {PRESET_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    aria-label={`Pick color ${c}`}
-                    className={`w-7 h-7 rounded-full ring-2 transition-all cursor-pointer ${
-                      color === c
-                        ? 'ring-primary scale-110'
-                        : 'ring-transparent'
-                    }`}
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="submit" disabled={submitting || !name.trim()}>
-                {submitting ? 'Adding…' : 'Add bank'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <BankDialog
+        open={open}
+        onOpenChange={setOpen}
+        mode="add"
+        onSubmit={async (data) => {
+          const bank: Bank = {
+            id: crypto.randomUUID(),
+            name: data.name,
+            interestRate: data.interestRate,
+            logoUrl: data.logoUrl,
+            themeColor: data.themeColor,
+            createdAt: new Date().toISOString(),
+          };
+          const ok = await onAdd(bank);
+          if (ok) {
+            setOpen(false);
+          }
+        }}
+      />
     </>
   );
 }
 
 function AddPocketButton({ onAdd }: { onAdd: (pocket: Pocket) => Promise<boolean> }) {
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [target, setTarget] = useState('');
-  const [icon, setIcon] = useState(PRESET_EMOJIS[0]);
-  const [submitting, setSubmitting] = useState(false);
 
   return (
     <>
-      <Button size="sm" variant="outline"  className="cursor-pointer">
+      <Button size="sm" variant="outline" className="cursor-pointer" onClick={() => setOpen(true)}>
         <Plus className="w-3.5 h-3.5 mr-1.5" />
         Add pocket
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add pocket</DialogTitle>
-            <DialogDescription>
-              Create a new pocket in the owner&apos;s wallet.
-            </DialogDescription>
-          </DialogHeader>
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setSubmitting(true);
-              const pocket: Pocket = {
-                id: crypto.randomUUID(),
-                name: name.trim(),
-                targetAmount: target ? parseFloat(target) : undefined,
-                icon,
-                createdAt: new Date().toISOString(),
-              };
-              const ok = await onAdd(pocket);
-              setSubmitting(false);
-              if (ok) {
-                setName('');
-                setTarget('');
-                setIcon(PRESET_EMOJIS[0]);
-                setOpen(false);
-              }
-            }}
-            className="space-y-3"
-          >
-            <div className="space-y-2">
-              <Label htmlFor="pocket-name">Name</Label>
-              <Input
-                id="pocket-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Vacation"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="pocket-target">Target amount (optional)</Label>
-              <Input
-                id="pocket-target"
-                type="number"
-                min={0}
-                step="any"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Icon</Label>
-              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
-                {PRESET_EMOJIS.map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    className={`w-8 h-8 rounded-lg text-lg flex items-center justify-center transition-all cursor-pointer ${
-                      icon === e
-                        ? 'bg-primary/10 ring-2 ring-primary'
-                        : 'bg-zinc-100 dark:bg-zinc-800'
-                    }`}
-                  >
-                    {e}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="submit" disabled={submitting || !name.trim()}>
-                {submitting ? 'Adding…' : 'Add pocket'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <PocketDialog
+        open={open}
+        onOpenChange={setOpen}
+        mode="add"
+        onSubmit={async (data) => {
+          const pocket: Pocket = {
+            id: crypto.randomUUID(),
+            name: data.name,
+            targetAmount: data.targetAmount,
+            icon: data.icon,
+            createdAt: new Date().toISOString(),
+          };
+          const ok = await onAdd(pocket);
+          if (ok) {
+            setOpen(false);
+          }
+        }}
+      />
     </>
   );
 }

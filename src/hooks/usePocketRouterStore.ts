@@ -171,10 +171,10 @@ export const usePocketRouterStore = create<PocketRouterState>()(
             { data: dbAllocations, error: allocsErr },
             { data: dbSettings, error: settingsErr },
           ] = await Promise.all([
-            supabase.from('banks').select('*'),
-            supabase.from('pockets').select('*'),
-            supabase.from('allocations').select('*'),
-            supabase.from('settings').select('*'),
+            supabase.from('banks').select('*').eq('user_id', user.id),
+            supabase.from('pockets').select('*').eq('user_id', user.id),
+            supabase.from('allocations').select('*').eq('user_id', user.id),
+            supabase.from('settings').select('*').eq('user_id', user.id),
           ]);
 
           if (banksErr) throw banksErr;
@@ -234,11 +234,14 @@ export const usePocketRouterStore = create<PocketRouterState>()(
         // Already subscribed → no-op
         if (banksChannel || pocketsChannel || allocationsChannel) return;
 
+        const user = useAuthStore.getState().user;
+        const filter = user ? `user_id=eq.${user.id}` : undefined;
+
         banksChannel = supabase
           .channel('banks-changes')
           .on<DbBank>(
             'postgres_changes',
-            { event: '*', schema: 'public', table: 'banks' },
+            { event: '*', schema: 'public', table: 'banks', filter },
             (payload) => {
               if (payload.eventType === 'INSERT') {
                 const bank = mapDbBank(payload.new);
@@ -264,7 +267,7 @@ export const usePocketRouterStore = create<PocketRouterState>()(
           .channel('pockets-changes')
           .on<DbPocket>(
             'postgres_changes',
-            { event: '*', schema: 'public', table: 'pockets' },
+            { event: '*', schema: 'public', table: 'pockets', filter },
             (payload) => {
               if (payload.eventType === 'INSERT') {
                 const pocket = mapDbPocket(payload.new);
@@ -294,7 +297,7 @@ export const usePocketRouterStore = create<PocketRouterState>()(
           .channel('allocations-changes')
           .on<DbAllocation>(
             'postgres_changes',
-            { event: '*', schema: 'public', table: 'allocations' },
+            { event: '*', schema: 'public', table: 'allocations', filter },
             (payload) => {
               if (payload.eventType === 'INSERT') {
                 const alloc = mapDbAllocation(payload.new);

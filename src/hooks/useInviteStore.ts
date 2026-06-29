@@ -9,6 +9,7 @@ import {
   InvitePermission,
   ShareAccess,
   ShareEntry,
+  AcceptedShareEntry,
 } from '@/types';
 import { generateInviteToken } from '@/lib/invite-token';
 
@@ -41,11 +42,13 @@ function mapShareAccess(row: DbShareAccess): ShareAccess {
 interface InviteState {
   /** Combined invite + share_access rows for the current owner. */
   entries: ShareEntry[];
+  acceptedShares: AcceptedShareEntry[];
   isLoading: boolean;
   lastError: string | null;
 
   // --- queries ---
   fetchEntries: () => Promise<void>;
+  fetchAcceptedShares: () => Promise<void>;
 
   // --- mutations ---
   /**
@@ -65,6 +68,8 @@ interface InviteState {
   ) => Promise<void>;
   /** Delete a granted share — immediately cuts off the friend's access. */
   deleteShareAccess: (shareAccessId: string) => Promise<void>;
+  /** Delete an accepted share (leaving a shared wallet). */
+  deleteAcceptedShare: (shareAccessId: string) => Promise<void>;
 }
 
 // ---- Helpers -----------------------------------------------------------
@@ -103,6 +108,7 @@ interface InviteWithJoin {
 
 export const useInviteStore = create<InviteState>()((set, get) => ({
   entries: [],
+  acceptedShares: [],
   isLoading: false,
   lastError: null,
 
@@ -175,6 +181,72 @@ export const useInviteStore = create<InviteState>()((set, get) => ({
     } catch (err) {
       const message = (err as Error)?.message || 'Failed to load sharing settings';
       set({ isLoading: false, lastError: message });
+    }
+  },
+
+  fetchAcceptedShares: async () => {
+    const user = useAuthStore.getState().user;
+    if (!user) {
+      set({ acceptedShares: [], isLoading: false });
+      return;
+    }
+
+    set({ isLoading: true, lastError: null });
+    try {
+      const { data, error } = await supabase
+        .from('share_access')
+        .select(`
+          id,
+          invite_id,
+          owner_id,
+          permission,
+          accepted_at,
+          invite:invites (
+            token,
+            revoked
+          )
+        `)
+        .eq('accepted_by', user.id);
+
+      if (error) throw error;
+
+      const activeShares = (data || []).filter(
+        (row: any) => row.invite && !row.invite.revoked,
+      );
+
+      if (activeShares.length === 0) {
+        set({ acceptedShares: [], isLoading: false });
+        return;
+      }
+
+      const ownerIds = Array.from(new Set(activeShares.map((row: any) => row.owner_id)));
+      const { data: profiles, error: profileErr } = await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .in('id', ownerIds);
+
+      if (profileErr) throw profileErr;
+
+      const profilesMap = new Map(
+        (profiles || []).map((p) => [p.id, p.display_name]),
+      );
+
+      const acceptedShares: AcceptedShareEntry[] = activeShares.map((row: any) => ({
+        id: row.id,
+        inviteId: row.invite_id,
+        ownerId: row.owner_id,
+        ownerName: profilesMap.get(row.owner_id) || 'Someone',
+        permission: row.permission,
+        acceptedAt: row.accepted_at,
+        token: row.invite.token,
+      }));
+
+      set({ acceptedShares, isLoading: false });
+    } catch (err) {
+      set({
+        isLoading: false,
+        lastError: (err as Error).message || 'Failed to load accepted shares',
+      });
     }
   },
 
@@ -301,6 +373,24 @@ export const useInviteStore = create<InviteState>()((set, get) => ({
       set({ entries: previous, lastError: error.message });
     }
   },
+
+  deleteAcceptedShare: async (shareAccessId) => {
+    const state = get();
+    const previous = state.acceptedShares;
+    // Optimistic: remove the share_access row from view.
+    set({
+      acceptedShares: previous.filter((s) => s.id !== shareAccessId),
+    });
+
+    const { error } = await supabase
+      .from('share_access')
+      .delete()
+      .eq('id', shareAccessId);
+
+    if (error) {
+      set({ acceptedShares: previous, lastError: error.message });
+    }
+  },
 }));
 
 // Re-export the picker for the settings UI which sometimes wants to
@@ -311,7 +401,7 @@ export function pickShareAccess(entries: ShareEntry[], inviteId: string): ShareA
 
 // Cross-store cleanup hook for signOut — called from useAuthStore.
 export function clearInviteState() {
-  useInviteStore.setState({ entries: [], lastError: null, isLoading: false });
+  useInviteStore.setState({ entries: [], acceptedShares: [], lastError: null, isLoading: false });
 }
 
 // Indirection so `useAuthStore` can call clearInviteState without
