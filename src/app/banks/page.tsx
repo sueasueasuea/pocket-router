@@ -19,6 +19,7 @@ import {
   GripVertical,
 } from 'lucide-react';
 import { DraggableListItem } from '@/components/DraggableListItem';
+import { sortByOrderAndDate } from '@/lib/utils';
 
 const PRESET_COLORS = [
   { name: 'Emerald', value: '#10b981' },
@@ -100,16 +101,7 @@ export default function ManageBanksPage() {
   };
 
   // Sort banks by user-defined order, fall back to creation time.
-  const sortedBanks = useMemo(
-    () =>
-      [...banks].sort((a, b) => {
-        const ao = a.order ?? Number.MAX_SAFE_INTEGER;
-        const bo = b.order ?? Number.MAX_SAFE_INTEGER;
-        if (ao !== bo) return ao - bo;
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      }),
-    [banks]
-  );
+  const sortedBanks = useMemo(() => sortByOrderAndDate(banks), [banks]);
 
   const handleReorderBank = useCallback(
     async (fromId: string, toIndex: number) => {

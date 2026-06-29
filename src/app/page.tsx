@@ -7,11 +7,14 @@ import { PocketCard } from '@/components/PocketCard';
 import Link from 'next/link';
 import { Plus, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useMemo } from 'react';
+import { sortByOrderAndDate } from '@/lib/utils';
 
 export default function Home() {
   const { pockets, allocations, settings } = usePocketRouterStore();
   const hasHydrated = useHasHydrated();
-
+// Sort by user-defined order, fall back to creation time for legacy items.
+  const sortedPockets = useMemo(() => sortByOrderAndDate(pockets), [pockets]);
   if (!hasHydrated) {
     return <div className="p-6">Loading...</div>;
   }
@@ -63,7 +66,7 @@ export default function Home() {
            </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {pockets.map(pocket => (
+              {sortedPockets.map(pocket => (
                 <PocketCard 
                   key={pocket.id} 
                   pocket={pocket} 

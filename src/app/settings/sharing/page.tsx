@@ -345,6 +345,7 @@ function InviteRow({
                   variant="outline"
                   className="cursor-pointer"
                   aria-label="Revoke invite"
+                  onClick={() => setConfirmRevoke(true)}
                 >
                   <Trash2 className="w-3.5 h-3.5 text-zinc-500" />
                 </Button>

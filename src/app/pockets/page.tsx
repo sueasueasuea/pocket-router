@@ -14,6 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { Plus, Trash2, Edit2, Wallet, GripVertical } from 'lucide-react';
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 import { DraggableListItem } from '@/components/DraggableListItem';
+import { sortByOrderAndDate } from '@/lib/utils';
 
 const PRESET_EMOJIS = [
   '🏠', '💳', '🏥', '🚗', '✈️', '🎓', '🍔', '🛍️',
@@ -49,16 +50,7 @@ export default function PocketsPage() {
   const [icon, setIcon] = useState(PRESET_EMOJIS[0]);
 
   // Sort by user-defined order, fall back to creation time for legacy items.
-  const sortedPockets = useMemo(
-    () =>
-      [...pockets].sort((a, b) => {
-        const ao = a.order ?? Number.MAX_SAFE_INTEGER;
-        const bo = b.order ?? Number.MAX_SAFE_INTEGER;
-        if (ao !== bo) return ao - bo;
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      }),
-    [pockets]
-  );
+  const sortedPockets = useMemo(() => sortByOrderAndDate(pockets), [pockets]);
 
   const handleReorderPocket = useCallback(
     async (fromId: string, toIndex: number) => {
@@ -370,6 +362,7 @@ export default function PocketsPage() {
                   <button
                     key={emoji}
                     type="button"
+                    onClick={() => setIcon(emoji)}
                     className={`w-8 cursor-pointer h-8 text-lg rounded-md flex items-center justify-center transition-all ${
                       icon === emoji 
                         ? 'bg-primary text-white scale-110 shadow-sm' 
@@ -421,6 +414,7 @@ export default function PocketsPage() {
                   <button
                     key={emoji}
                     type="button"
+                    onClick={() => setIcon(emoji)}
                     className={`w-8 cursor-pointer h-8 text-lg rounded-md flex items-center justify-center transition-all ${
                       icon === emoji 
                         ? 'bg-primary text-white scale-110 shadow-sm' 

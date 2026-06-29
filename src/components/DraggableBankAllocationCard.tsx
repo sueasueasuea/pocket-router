@@ -356,6 +356,7 @@ export function DraggableBankAllocationCard({
                 aria-label={`Remove ${bank.name} from this pocket`}
                 title="Remove from this pocket"
                 onPointerDown={(e) => e.stopPropagation()}
+                onClick={()=>onRemove()}
                 className="cursor-pointer flex-shrink-0 h-11 w-11 rounded-full flex items-center justify-center text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 active:scale-95 transition-all touch-none"
               >
                 <Trash2 className="w-5 h-5" />

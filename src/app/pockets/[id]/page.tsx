@@ -511,7 +511,7 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
             <DialogFooter>
               <Button
                 type="submit"
-                className="w-full rounded-full"
+                className="w-full rounded-full cursor-pointer"
                 disabled={!selectedBankId || !allocAmount || banks.length === 0}
               >
                 Allocate
