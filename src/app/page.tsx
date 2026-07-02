@@ -2,12 +2,12 @@
 
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
 import { useInviteStore } from '@/hooks/useInviteStore';
-import { useAuthStore } from '@/hooks/useAuthStore';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useHasHydrated } from '@/hooks/useHasHydrated';
 import { DashboardSummary } from '@/components/DashboardSummary';
 import { PocketCard } from '@/components/PocketCard';
 import Link from 'next/link';
-import { Plus, ArrowRight, Share2, Wallet, Users } from 'lucide-react';
+import { Loader2, Plus, ArrowRight, Share2, Wallet, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMemo, useEffect } from 'react';
 import { sortByOrderAndDate } from '@/lib/utils';
@@ -15,7 +15,7 @@ import { sortByOrderAndDate } from '@/lib/utils';
 export default function Home() {
   const { pockets, allocations, settings } = usePocketRouterStore();
   const { acceptedShares, fetchAcceptedShares } = useInviteStore();
-  const user = useAuthStore((s) => s.user);
+  const { isReady, user } = useRequireAuth();
   const hasHydrated = useHasHydrated();
 
   // Sort by user-defined order, fall back to creation time for legacy items.
@@ -29,8 +29,12 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  if (!hasHydrated) {
-    return <div className="p-6">Loading...</div>;
+  if (!hasHydrated || !isReady) {
+    return (
+      <div className="flex flex-col min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (

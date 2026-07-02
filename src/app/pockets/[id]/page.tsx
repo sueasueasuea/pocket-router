@@ -3,6 +3,7 @@
 import { useState, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useHasHydrated } from '@/hooks/useHasHydrated';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +17,7 @@ import { TransferDialog } from '@/components/TransferDialog';
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 import {
   ArrowLeft,
+  Loader2,
   Plus,
   Landmark,
   Wallet,
@@ -39,6 +41,7 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
   } = usePocketRouterStore();
 
   const hasHydrated = useHasHydrated();
+  const { isReady } = useRequireAuth();
 
   // Drag state
   const [draggingBankId, setDraggingBankId] = useState<string | null>(null);
@@ -206,8 +209,12 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
     }
   };
 
-  if (!hasHydrated) {
-    return <div className="p-6">Loading...</div>;
+  if (!hasHydrated || !isReady) {
+    return (
+      <main className="flex flex-col min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </main>
+    );
   }
 
   if (!pocket) {

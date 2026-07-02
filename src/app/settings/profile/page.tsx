@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Globe,
@@ -22,24 +21,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAuthStore } from '@/hooks/useAuthStore';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
 import { useHasHydrated } from '@/hooks/useHasHydrated';
 
 export default function ProfileSettingsPage() {
-  const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-  const isAuthInitialized = useAuthStore((s) => s.isInitialized);
+  const { isReady } = useRequireAuth();
 
-  // Auth gate — bounce to /login (preserving the intended destination)
-  // if the visitor isn't signed in. Mirrors the pattern from
-  // /settings/sharing.
-  useEffect(() => {
-    if (isAuthInitialized && !user) {
-      router.push('/login?next=/settings/profile');
-    }
-  }, [isAuthInitialized, user, router]);
-
-  if (!isAuthInitialized || !user) {
+  if (!isReady) {
     return (
       <main className="flex flex-col min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

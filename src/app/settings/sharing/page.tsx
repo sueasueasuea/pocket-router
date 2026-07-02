@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
-import { useAuthStore } from '@/hooks/useAuthStore';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useInviteStore } from '@/hooks/useInviteStore';
 import { buildInviteUrl } from '@/lib/invite-token';
 import type { InvitePermission, ShareEntry, AcceptedShareEntry } from '@/types';
@@ -34,8 +34,7 @@ const MAX_INVITES = 50;
 
 export default function SharingSettingsPage() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-  const isAuthInitialized = useAuthStore((s) => s.isInitialized);
+  const { isReady, user } = useRequireAuth();
 
   const {
     entries,
@@ -55,13 +54,6 @@ export default function SharingSettingsPage() {
   const [newPermission, setNewPermission] = useState<InvitePermission>('view');
   const [copyingToken, setCopyingToken] = useState<string | null>(null);
 
-  // Auth gate.
-  useEffect(() => {
-    if (isAuthInitialized && !user) {
-      router.push('/login?next=/settings/sharing');
-    }
-  }, [isAuthInitialized, user, router]);
-
   // Fetch entries once on mount (and when user changes).
   useEffect(() => {
     if (user) {
@@ -71,7 +63,7 @@ export default function SharingSettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  if (!isAuthInitialized || !user) {
+  if (!isReady) {
     return (
       <main className="flex flex-col min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

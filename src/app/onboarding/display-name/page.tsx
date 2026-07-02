@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useAuthStore } from '@/hooks/useAuthStore';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 
 /**
  * Only allow same-origin relative paths as the post-onboarding
@@ -32,20 +33,9 @@ function OnboardingDisplayNameInner() {
   const searchParams = useSearchParams();
   const nextPath = safeNextPath(searchParams.get('next'));
 
-  const user = useAuthStore((s) => s.user);
-  const isAuthInitialized = useAuthStore((s) => s.isInitialized);
+  const { isReady, user } = useRequireAuth();
   const profile = useAuthStore((s) => s.profile);
   const refreshProfile = useAuthStore((s) => s.refreshProfile);
-
-  // Auth gate — bounce to /login (preserving the intended `next`) if
-  // the visitor isn't signed in. We deliberately don't render an
-  // onboarding UI for anonymous users, since the OAuth callback is
-  // the only path that drops an unauthenticated user here.
-  useEffect(() => {
-    if (isAuthInitialized && !user) {
-      router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
-    }
-  }, [isAuthInitialized, user, router, nextPath]);
 
   // If the auth store says the user already has a display name (e.g.
   // they refreshed the page after finishing onboarding), skip the
@@ -54,16 +44,19 @@ function OnboardingDisplayNameInner() {
   // value means "still needs onboarding".
   useEffect(() => {
     if (
-      isAuthInitialized &&
+      isReady &&
       user &&
       profile &&
       profile.display_name.trim().length >= 2
     ) {
       router.replace(nextPath);
     }
-  }, [isAuthInitialized, user, profile, router, nextPath]);
+  }, [isReady, user, profile, router, nextPath]);
+  // `user` is non-null when `isReady` is true, but TS can't infer
+  // that across the hook boundary — so we re-check it here for
+  // narrowness.
 
-  if (!isAuthInitialized || !user) {
+  if (!isReady) {
     return (
       <main className="flex flex-col min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

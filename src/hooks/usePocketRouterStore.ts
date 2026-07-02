@@ -341,11 +341,6 @@ export const usePocketRouterStore = create<PocketRouterState>()(
         const state = get();
         const user = useAuthStore.getState().user;
 
-        if (!user && state.banks.length >= 3) {
-          alert('Offline mode allows a maximum of 3 banks. Please log in to add more.');
-          return;
-        }
-
         const fullBank: Bank = { ...bank, order: bank.order ?? state.banks.length + 1 };
         const previousBanks = state.banks;
         const useCloud = state.settings.storageType === 'supabase';
@@ -472,11 +467,6 @@ export const usePocketRouterStore = create<PocketRouterState>()(
       addPocket: async (pocket) => {
         const state = get();
         const user = useAuthStore.getState().user;
-
-        if (!user && state.pockets.length >= 5) {
-          alert('Offline mode allows a maximum of 5 pockets. Please log in to add more.');
-          return;
-        }
 
         const fullPocket: Pocket = {
           ...pocket,

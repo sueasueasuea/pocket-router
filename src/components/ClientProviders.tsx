@@ -16,26 +16,17 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
     };
   }, [initialize]);
 
-  useEffect(() => {
-    if (isInitialized) {
-      const storageType = usePocketRouterStore.getState().settings.storageType;
-      if (user) {
-        if (storageType !== 'supabase') {
-          usePocketRouterStore.getState().updateSettings({ storageType: 'supabase' });
-        }
-      } else {
-        if (storageType !== 'local') {
-          usePocketRouterStore.getState().updateSettings({ storageType: 'local' });
-        }
-      }
-    }
-  }, [user, isInitialized]);
-
-  // Realtime: subscribe when signed in + cloud mode, unsubscribe otherwise.
+  // Guest mode is gone — every signed-in user is on cloud storage.
+  // We still flip storageType to 'supabase' defensively in case a
+  // previous session persisted 'local' (legacy guest-mode data) and
+  // the same device is now signed in to a new account.
   useEffect(() => {
     if (!isInitialized) return;
-    const storageType = usePocketRouterStore.getState().settings.storageType;
-    if (user && storageType === 'supabase') {
+    if (user) {
+      const storageType = usePocketRouterStore.getState().settings.storageType;
+      if (storageType !== 'supabase') {
+        usePocketRouterStore.getState().updateSettings({ storageType: 'supabase' });
+      }
       usePocketRouterStore.getState().subscribeRealtime();
     } else {
       usePocketRouterStore.getState().unsubscribeRealtime();

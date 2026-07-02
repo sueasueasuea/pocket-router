@@ -281,12 +281,6 @@ function LoginPageInner() {
           </p>
         </CardFooter>
       </Card>
-
-      <div className="mt-8">
-        <Button variant="link" className="text-zinc-500 text-sm cursor-pointer" onClick={() => router.push('/')}>
-          Continue as guest (Offline mode)
-        </Button>
-      </div>
     </div>
   );
 }

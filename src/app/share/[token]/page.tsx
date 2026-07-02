@@ -1,7 +1,6 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   Eye,
@@ -25,7 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuthStore } from '@/hooks/useAuthStore';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useSharedViewStore } from '@/hooks/useSharedViewStore';
 import { useHasHydrated } from '@/hooks/useHasHydrated';
 import type { Bank, Pocket, Allocation, InvitePermission } from '@/types';
@@ -39,10 +38,8 @@ export default function ShareViewPage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = use(params);
-  const router = useRouter();
 
-  const user = useAuthStore((s) => s.user);
-  const isAuthInitialized = useAuthStore((s) => s.isInitialized);
+  const { isReady } = useRequireAuth();
 
   const {
     ownerId,
@@ -66,14 +63,13 @@ export default function ShareViewPage({
 
   const [loadFailed, setLoadFailed] = useState<string | null>(null);
 
-  // Load on mount, reset on unmount.
+  // Load on mount, reset on unmount. The redirect for unsigned
+  // visitors is handled by `useRequireAuth()`; here we just gate the
+  // data fetch on `isReady` so we never call loadSharedView without
+  // a session.
   useEffect(() => {
+    if (!isReady) return;
     let cancelled = false;
-    if (!isAuthInitialized) return;
-    if (!user) {
-      router.push(`/login?next=/share/${token}`);
-      return;
-    }
     (async () => {
       const ok = await loadSharedView(token);
       if (cancelled) return;
@@ -85,16 +81,16 @@ export default function ShareViewPage({
       cancelled = true;
       reset();
     };
-    // We intentionally only depend on token + isAuthInitialized; if
-    // `user` changes mid-flight we let the effect re-run.
+    // We intentionally only depend on token + isReady; if the user
+    // changes mid-flight we let the effect re-run.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, isAuthInitialized, user?.id]);
+  }, [token, isReady]);
 
   // -------------------------------------------------------------
   // Loading / error states
   // -------------------------------------------------------------
 
-  if (!isAuthInitialized || (isLoading && !ownerId)) {
+  if (!isReady || (isLoading && !ownerId)) {
     return (
       <main className="flex flex-col min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

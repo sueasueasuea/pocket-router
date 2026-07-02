@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useHasHydrated } from '@/hooks/useHasHydrated';
 import { Pocket } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Trash2, Edit2, Wallet, GripVertical } from 'lucide-react';
+import { Loader2, Plus, Trash2, Edit2, Wallet, GripVertical } from 'lucide-react';
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 import { DraggableListItem } from '@/components/DraggableListItem';
 import { sortByOrderAndDate } from '@/lib/utils';
@@ -21,6 +22,7 @@ export default function PocketsPage() {
   const { pockets, allocations, settings, addPocket, updatePocket, deletePocket, reorderPockets } = usePocketRouterStore();
   const hasHydrated = useHasHydrated();
   const router = useRouter();
+  const { isReady } = useRequireAuth();
 
   // Dialog States
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -93,7 +95,13 @@ export default function PocketsPage() {
     setKeyboardPocketTargetIndex(targetIndex);
   }, []);
 
-  if (!hasHydrated) return <div className="p-6">Loading...</div>;
+  if (!hasHydrated || !isReady) {
+    return (
+      <main className="flex flex-col min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </main>
+    );
+  }
 
   const handleAddPocket = (data: PocketFormData) => {
     const newPocket: Pocket = {

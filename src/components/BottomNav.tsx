@@ -10,14 +10,17 @@ import { useAuthStore } from '@/hooks/useAuthStore';
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { fetchData, settings, isLoading } = usePocketRouterStore();
+  const { fetchData, isLoading } = usePocketRouterStore();
   const user = useAuthStore((state) => state.user);
 
+  // Guest mode is gone — every signed-in user is on cloud storage, so
+  // we always pull fresh data on mount. (The old check against
+  // `settings.storageType === 'supabase'` was the offline-mode gate.)
   useEffect(() => {
-    if (settings.storageType === 'supabase') {
+    if (user) {
       fetchData();
     }
-  }, [settings.storageType, fetchData]);
+  }, [user, fetchData]);
 
   const links = [
     { href: '/', label: 'Home', icon: Home },

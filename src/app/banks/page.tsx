@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
+import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { useHasHydrated } from '@/hooks/useHasHydrated';
 import { Bank } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 import { Card, CardContent } from '@/components/ui/card';
 import {
+  Loader2,
   Plus,
   Landmark,
   Edit2,
@@ -34,6 +36,7 @@ export default function ManageBanksPage() {
   } = usePocketRouterStore();
 
   const hasHydrated = useHasHydrated();
+  const { isReady } = useRequireAuth();
 
   // Add bank dialog
   const [isAddBankOpen, setIsAddBankOpen] = useState(false);
@@ -183,8 +186,12 @@ export default function ManageBanksPage() {
     }
   };
 
-  if (!hasHydrated) {
-    return <div className="p-6">Loading...</div>;
+  if (!hasHydrated || !isReady) {
+    return (
+      <main className="flex flex-col min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </main>
+    );
   }
 
   return (
