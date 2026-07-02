@@ -34,6 +34,19 @@ export interface AppSettings {
   storageType?: 'local' | 'supabase';
 }
 
+export type TransactionType = 'deposit' | 'withdraw' | 'transfer';
+
+export interface Transaction {
+  id: string; // UUID
+  user_id?: string;
+  pocketId: string;
+  bankId?: string | null;     // bank ที่เกี่ยวข้อง (source ในกรณี transfer หรือ bank ที่ฝาก/ถอน)
+  toBankId?: string | null;   // bank ปลายทาง (เฉพาะ transfer)
+  type: TransactionType;
+  amount: number;
+  createdAt: string;
+}
+
 // Derived Types for Dashboard Display
 export interface PocketSummary extends Pocket {
   currentAmount: number;

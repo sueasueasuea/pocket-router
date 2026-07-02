@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, use } from 'react';
+import { useState, useCallback, use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DraggableBankAllocationCard } from '@/components/DraggableBankAllocationCard';
 import { TransferDialog } from '@/components/TransferDialog';
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
+import { TransactionList } from '@/components/TransactionList';
 import {
   ArrowLeft,
   Loader2,
@@ -38,10 +39,17 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
     updateAllocation,
     deleteAllocation,
     transferBetweenBanks,
+    fetchTransactions,
   } = usePocketRouterStore();
 
   const hasHydrated = useHasHydrated();
   const { isReady } = useRequireAuth();
+
+  useEffect(() => {
+    if (isReady && pocketId) {
+      fetchTransactions(pocketId);
+    }
+  }, [isReady, pocketId, fetchTransactions]);
 
   // Drag state
   const [draggingBankId, setDraggingBankId] = useState<string | null>(null);
@@ -416,6 +424,19 @@ export default function PocketDetailPage({ params }: { params: Promise<{ id: str
             </CardContent>
           </Card>
         )}
+
+        {/* Recent Activity */}
+        <section className="mt-6 flex flex-col gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider">
+              Recent Activity
+            </h2>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              Historical allocation changes and transfers
+            </p>
+          </div>
+          <TransactionList pocketId={pocketId} />
+        </section>
       </div>
 
       {/* Transfer Dialog */}
