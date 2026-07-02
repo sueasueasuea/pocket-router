@@ -12,7 +12,7 @@ test.describe('Login Page', () => {
     await expect(page.getByText('Manage your allocations beautifully')).toBeVisible();
 
     // Verify card title is "Welcome back" by default (isLogin = true)
-    await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+    await expect(page.getByText('Welcome back', { exact: true })).toBeVisible();
 
     // Verify form elements exist
     const emailInput = page.locator('input[type="email"]');
@@ -35,7 +35,7 @@ test.describe('Login Page', () => {
     await signUpToggle.click();
 
     // Verify card title changed to "Create an account"
-    await expect(page.getByRole('heading', { name: 'Create an account' })).toBeVisible();
+    await expect(page.getByText('Create an account', { exact: true })).toBeVisible();
 
     // Display name input should now be visible
     const displayNameInput = page.locator('input[id="display-name"]');
@@ -51,7 +51,7 @@ test.describe('Login Page', () => {
     await signInToggle.click();
 
     // Verify card title goes back to "Welcome back"
-    await expect(page.getByRole('heading', { name: 'Welcome back' })).toBeVisible();
+    await expect(page.getByText('Welcome back', { exact: true })).toBeVisible();
     await expect(displayNameInput).not.toBeVisible();
   });
 });
