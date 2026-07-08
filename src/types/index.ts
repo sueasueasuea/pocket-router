@@ -31,7 +31,6 @@ export interface Allocation {
 export interface AppSettings {
   user_id?: string;
   currency: string;
-  storageType?: 'local' | 'supabase';
 }
 
 export type TransactionType = 'deposit' | 'withdraw' | 'transfer';

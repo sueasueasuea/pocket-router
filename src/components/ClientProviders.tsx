@@ -16,17 +16,12 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
     };
   }, [initialize]);
 
-  // Guest mode is gone — every signed-in user is on cloud storage.
-  // We still flip storageType to 'supabase' defensively in case a
-  // previous session persisted 'local' (legacy guest-mode data) and
-  // the same device is now signed in to a new account.
+  // All storage is Supabase — subscribe to realtime and fetch fresh data
+  // once auth finishes and a user is present.
   useEffect(() => {
     if (!isInitialized) return;
     if (user) {
-      const storageType = usePocketRouterStore.getState().settings.storageType;
-      if (storageType !== 'supabase') {
-        usePocketRouterStore.getState().updateSettings({ storageType: 'supabase' });
-      }
+      usePocketRouterStore.getState().fetchData();
       usePocketRouterStore.getState().subscribeRealtime();
     } else {
       usePocketRouterStore.getState().unsubscribeRealtime();

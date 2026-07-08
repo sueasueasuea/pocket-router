@@ -165,7 +165,6 @@ export const usePocketRouterStore = create<PocketRouterState>()(
       transactions: [],
       settings: {
         currency: 'THB',
-        storageType: 'local',
       },
       isLoading: false,
       lastError: null,
@@ -183,7 +182,7 @@ export const usePocketRouterStore = create<PocketRouterState>()(
           pockets: [],
           allocations: [],
           transactions: [],
-          settings: { currency: 'THB', storageType: 'local' },
+          settings: { currency: 'THB' },
           lastError: null,
         });
         // The zustand `persist` middleware auto-writes on state changes, so
@@ -193,7 +192,6 @@ export const usePocketRouterStore = create<PocketRouterState>()(
 
       fetchData: async () => {
         const state = get();
-        if (state.settings.storageType !== 'supabase') return;
 
         const user = useAuthStore.getState().user;
         if (!user) return;
@@ -249,7 +247,7 @@ export const usePocketRouterStore = create<PocketRouterState>()(
             banks,
             pockets,
             allocations,
-            settings: { currency, storageType: 'supabase' },
+            settings: { currency },
             isLoading: false,
           });
         } catch (error) {
@@ -400,12 +398,9 @@ export const usePocketRouterStore = create<PocketRouterState>()(
 
         const fullBank: Bank = { ...bank, order: bank.order ?? state.banks.length + 1 };
         const previousBanks = state.banks;
-        const useCloud = state.settings.storageType === 'supabase';
 
         // Optimistic
         set({ banks: [...previousBanks, fullBank] });
-
-        if (!useCloud) return;
 
         const { error } = await supabase.from('banks').insert({
           id: fullBank.id,
@@ -427,14 +422,11 @@ export const usePocketRouterStore = create<PocketRouterState>()(
       updateBank: async (id, updatedBank) => {
         const state = get();
         const previousBanks = state.banks;
-        const useCloud = state.settings.storageType === 'supabase';
 
         // Optimistic
         set({
           banks: previousBanks.map((b) => (b.id === id ? { ...b, ...updatedBank } : b)),
         });
-
-        if (!useCloud) return;
 
         const { error } = await supabase
           .from('banks')
@@ -458,15 +450,12 @@ export const usePocketRouterStore = create<PocketRouterState>()(
         const state = get();
         const previousBanks = state.banks;
         const previousAllocations = state.allocations;
-        const useCloud = state.settings.storageType === 'supabase';
 
         // Optimistic
         set({
           banks: previousBanks.filter((b) => b.id !== id),
           allocations: previousAllocations.filter((a) => a.bankId !== id),
         });
-
-        if (!useCloud) return;
 
         const { error } = await supabase.from('banks').delete().eq('id', id);
 
@@ -482,7 +471,6 @@ export const usePocketRouterStore = create<PocketRouterState>()(
       reorderBanks: async (orderedIds) => {
         const state = get();
         const previousBanks = state.banks;
-        const useCloud = state.settings.storageType === 'supabase';
 
         // Compute new order map
         const indexById = new Map<string, number>();
@@ -495,8 +483,6 @@ export const usePocketRouterStore = create<PocketRouterState>()(
 
         // Optimistic
         set({ banks: nextBanks });
-
-        if (!useCloud) return;
 
         // Batch-update all rows
         const results = await Promise.allSettled(
@@ -530,11 +516,8 @@ export const usePocketRouterStore = create<PocketRouterState>()(
           order: pocket.order ?? state.pockets.length + 1,
         };
         const previousPockets = state.pockets;
-        const useCloud = state.settings.storageType === 'supabase';
 
         set({ pockets: [...previousPockets, fullPocket] });
-
-        if (!useCloud) return;
 
         const { error } = await supabase.from('pockets').insert({
           id: fullPocket.id,
@@ -557,15 +540,12 @@ export const usePocketRouterStore = create<PocketRouterState>()(
       updatePocket: async (id, updatedPocket) => {
         const state = get();
         const previousPockets = state.pockets;
-        const useCloud = state.settings.storageType === 'supabase';
 
         set({
           pockets: previousPockets.map((p) =>
             p.id === id ? { ...p, ...updatedPocket } : p
           ),
         });
-
-        if (!useCloud) return;
 
         const { error } = await supabase
           .from('pockets')
@@ -588,14 +568,11 @@ export const usePocketRouterStore = create<PocketRouterState>()(
         const state = get();
         const previousPockets = state.pockets;
         const previousAllocations = state.allocations;
-        const useCloud = state.settings.storageType === 'supabase';
 
         set({
           pockets: previousPockets.filter((p) => p.id !== id),
           allocations: previousAllocations.filter((a) => a.pocketId !== id),
         });
-
-        if (!useCloud) return;
 
         const { error } = await supabase.from('pockets').delete().eq('id', id);
 
@@ -611,7 +588,6 @@ export const usePocketRouterStore = create<PocketRouterState>()(
       reorderPockets: async (orderedIds) => {
         const state = get();
         const previousPockets = state.pockets;
-        const useCloud = state.settings.storageType === 'supabase';
 
         const indexById = new Map<string, number>();
         orderedIds.forEach((id, idx) => indexById.set(id, idx + 1));
@@ -622,8 +598,6 @@ export const usePocketRouterStore = create<PocketRouterState>()(
         }));
 
         set({ pockets: nextPockets });
-
-        if (!useCloud) return;
 
         const results = await Promise.allSettled(
           nextPockets.map((p) =>
@@ -651,14 +625,8 @@ export const usePocketRouterStore = create<PocketRouterState>()(
         const state = get();
         const user = useAuthStore.getState().user;
         const previousAllocations = state.allocations;
-        const useCloud = state.settings.storageType === 'supabase';
 
         set({ allocations: [...previousAllocations, allocation] });
-
-        if (!useCloud) {
-          await get().logTransaction(allocation.pocketId, allocation.bankId, null, 'deposit', allocation.amount);
-          return;
-        }
 
         const { error } = await supabase.from('allocations').insert({
           id: allocation.id,
@@ -682,7 +650,6 @@ export const usePocketRouterStore = create<PocketRouterState>()(
       updateAllocation: async (id, updatedAllocation) => {
         const state = get();
         const previousAllocations = state.allocations;
-        const useCloud = state.settings.storageType === 'supabase';
         const existingAlloc = previousAllocations.find((a) => a.id === id);
 
         set({
@@ -694,14 +661,6 @@ export const usePocketRouterStore = create<PocketRouterState>()(
         const diff = existingAlloc && updatedAllocation.amount !== undefined
           ? updatedAllocation.amount - existingAlloc.amount
           : 0;
-
-        if (!useCloud) {
-          if (existingAlloc && diff !== 0) {
-            const type = diff > 0 ? 'deposit' : 'withdraw';
-            await get().logTransaction(existingAlloc.pocketId, existingAlloc.bankId, null, type, Math.abs(diff));
-          }
-          return;
-        }
 
         const { error } = await supabase
           .from('allocations')
@@ -724,17 +683,9 @@ export const usePocketRouterStore = create<PocketRouterState>()(
       deleteAllocation: async (id) => {
         const state = get();
         const previousAllocations = state.allocations;
-        const useCloud = state.settings.storageType === 'supabase';
         const existingAlloc = previousAllocations.find((a) => a.id === id);
 
         set({ allocations: previousAllocations.filter((a) => a.id !== id) });
-
-        if (!useCloud) {
-          if (existingAlloc) {
-            await get().logTransaction(existingAlloc.pocketId, existingAlloc.bankId, null, 'withdraw', existingAlloc.amount);
-          }
-          return;
-        }
 
         const { error } = await supabase.from('allocations').delete().eq('id', id);
 
@@ -754,7 +705,6 @@ export const usePocketRouterStore = create<PocketRouterState>()(
         const state = get();
         const user = useAuthStore.getState().user;
         const previousAllocations = state.allocations;
-        const useCloud = state.settings.storageType === 'supabase';
 
         const sourceAlloc = previousAllocations.find(
           (a) => a.pocketId === pocketId && a.bankId === fromBankId
@@ -796,11 +746,6 @@ export const usePocketRouterStore = create<PocketRouterState>()(
         })();
 
         set({ allocations: optimisticAllocations });
-
-        if (!useCloud) {
-          await get().logTransaction(pocketId, fromBankId, toBankId, 'transfer', amount);
-          return true;
-        }
 
         // Persist to DB
         try {
@@ -859,20 +804,8 @@ export const usePocketRouterStore = create<PocketRouterState>()(
         // Optimistic
         set({ settings: updated });
 
-        // If we just toggled to supabase, fetch from DB
-        if (newSettings.storageType === 'supabase' && previousSettings.storageType !== 'supabase') {
-          await get().fetchData();
-          return;
-        }
-
-        if (newSettings.storageType === 'local' && previousSettings.storageType !== 'local') {
-          // Toggled to local — unsubscribe realtime
-          get().unsubscribeRealtime();
-          return;
-        }
-
         // Persist currency change to cloud
-        if (updated.storageType === 'supabase' && user && newSettings.currency !== undefined) {
+        if (user && newSettings.currency !== undefined) {
           try {
             const { data: existing } = await supabase.from('settings').select('id');
             if (existing && existing.length > 0) {
@@ -894,9 +827,8 @@ export const usePocketRouterStore = create<PocketRouterState>()(
       },
 
       fetchTransactions: async (pocketId) => {
-        const state = get();
         const user = useAuthStore.getState().user;
-        if (state.settings.storageType !== 'supabase' || !user) return;
+        if (!user) return;
 
         try {
           const { data, error } = await supabase
@@ -921,9 +853,7 @@ export const usePocketRouterStore = create<PocketRouterState>()(
       },
 
       logTransaction: async (pocketId, bankId, toBankId, type, amount) => {
-        const state = get();
         const user = useAuthStore.getState().user;
-        const useCloud = state.settings.storageType === 'supabase';
 
         const newTx: Transaction = {
           id: crypto.randomUUID(),
@@ -937,8 +867,6 @@ export const usePocketRouterStore = create<PocketRouterState>()(
         };
 
         set((s) => ({ transactions: [newTx, ...s.transactions] }));
-
-        if (!useCloud) return;
 
         try {
           const { error } = await supabase.from('transactions').insert({

@@ -4,23 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Wallet, User, Landmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useEffect } from 'react';
 import { usePocketRouterStore } from '@/hooks/usePocketRouterStore';
 import { useAuthStore } from '@/hooks/useAuthStore';
 
 export function BottomNav() {
   const pathname = usePathname();
-  const { fetchData, isLoading } = usePocketRouterStore();
+  const isLoading = usePocketRouterStore((s) => s.isLoading);
   const user = useAuthStore((state) => state.user);
-
-  // Guest mode is gone — every signed-in user is on cloud storage, so
-  // we always pull fresh data on mount. (The old check against
-  // `settings.storageType === 'supabase'` was the offline-mode gate.)
-  useEffect(() => {
-    if (user) {
-      fetchData();
-    }
-  }, [user, fetchData]);
 
   const links = [
     { href: '/', label: 'Home', icon: Home },

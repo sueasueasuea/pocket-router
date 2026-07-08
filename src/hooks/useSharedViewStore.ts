@@ -136,7 +136,7 @@ export const useSharedViewStore = create<SharedViewState>()((set, get) => ({
   banks: [],
   pockets: [],
   allocations: [],
-  settings: { currency: 'THB', storageType: 'supabase' },
+  settings: { currency: 'THB' },
   isLoading: false,
   lastError: null,
 
@@ -243,9 +243,8 @@ export const useSharedViewStore = create<SharedViewState>()((set, get) => ({
           ? {
               user_id: ownerId,
               currency: (dbSettings[0].currency as string) || 'THB',
-              storageType: 'supabase',
             }
-          : { user_id: ownerId, currency: 'THB', storageType: 'supabase' };
+          : { user_id: ownerId, currency: 'THB' };
 
       set({
         ownerId,
@@ -277,7 +276,7 @@ export const useSharedViewStore = create<SharedViewState>()((set, get) => ({
       banks: [],
       pockets: [],
       allocations: [],
-      settings: { currency: 'THB', storageType: 'supabase' },
+      settings: { currency: 'THB' },
       isLoading: false,
       lastError: null,
     });
